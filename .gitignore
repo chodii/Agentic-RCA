@@ -1,0 +1,11 @@
+# Ignore everything
+*
+
+# But do not ignore folders, otherwise Git cannot find .py files inside them
+!*/
+
+# Keep Python scripts anywhere in the repo
+!*.py
+
+# Keep this .gitignore file itself
+!.gitignore

@@ -1,0 +1,152 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Mar 26 01:06:52 2026
+
+@author: chodo
+"""
+
+import os, sys
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from DataPreprocessing import _dataset_walker as walker
+import json
+from pathlib import Path
+from typing import Optional
+
+import psycopg2
+
+
+DB_CONFIG = {
+    "host": "localhost",
+    "port": 5432,
+    "dbname": "monlis",
+    "user": "chody",
+    "password": os.environ["MONLIS_DB_PSW"],
+}
+
+
+def parse_record(obj: dict) -> Optional[dict]:
+    """
+    Expected JSON format:
+    {
+        "source": "...",
+        "chunk_id": 0,
+        "content": [
+            ["2025-03-11T08:18:47.049000+00:00", "<time> Info ..."],
+            ...
+        ]
+    }
+    """
+    source_path = obj.get("source")
+    chunk_id = obj.get("chunk_id")
+    content = obj.get("content")
+
+    if source_path is None or chunk_id is None or not content:
+        return None
+
+    return {
+        "source_path": source_path,
+        "chunk_id": int(chunk_id),
+        "content_json": json.dumps(content),
+        "content_text": flatten_content(content),
+        "time_start": content[0][0],
+        "time_end": content[-1][0] if content[0][0] is not None else None,
+        "has_time": content[0][0] is not None
+    }
+
+
+def insert_one(cur, rec: dict) -> None:
+    cur.execute(
+        """
+        INSERT INTO log_chunks (
+            source_path,
+            chunk_id,
+            content_json,
+            content_text,
+            time_start,
+            time_end,
+            has_time
+        )
+        VALUES (
+            %(source_path)s,
+            %(chunk_id)s,
+            %(content_json)s::jsonb,
+            %(content_text)s,
+            %(time_start)s,
+            %(time_end)s,
+            %(has_time)s
+        )
+        ON CONFLICT (source_path, chunk_id)
+        DO UPDATE SET
+            content_json = EXCLUDED.content_json,
+            content_text = EXCLUDED.content_text,
+            time_start = EXCLUDED.time_start,
+            time_end = EXCLUDED.time_end,
+            has_time = EXCLUDED.has_time
+        """,
+        rec,
+    )
+
+def clear_db(cur):
+    cur.execute("DELETE FROM log_chunks;")
+
+def import_dataset(root, clear_first=True):
+    CHUNK_DIR = Path(root)
+    inserted = 0
+    skipped = 0
+
+    with psycopg2.connect(**DB_CONFIG) as conn:
+        with conn.cursor() as cur:
+            if clear_first:
+                clear_db(cur)
+            for fp in walker.iter_spec_files(CHUNK_DIR,ext="json"):
+                try:
+                    with fp.open("r", encoding="utf-8") as f:
+                        obj = json.load(f)
+
+                    rec = parse_record(obj)
+                    if rec is None:
+                        skipped += 1
+                        print(f"Skipping malformed JSON record in: {fp}")
+                        continue
+
+                    insert_one(cur, rec)
+                    inserted += 1
+
+                    if inserted % 1000 == 0:
+                        conn.commit()
+                        print(f"Inserted {inserted} records so far...")
+
+                except Exception as e:
+                    conn.rollback()
+                    skipped += 1
+                    print(f"Skipping {fp}: {e}")
+            conn.commit()
+    print(f"Done. Inserted={inserted}, skipped={skipped}")
+
+def flatten_content(content) -> str:
+    return "\n".join(line for _, line in content)
+
+def api(root):
+    import_dataset(root, clear_first=True)
+
+import argparse
+def parse_args():
+    parser = argparse.ArgumentParser(
+       description="Give me the time, I'll give you files and tell you where to start."
+       )
+    parser.add_argument(
+        "-r", "--root",
+        dest="root",
+        type=str,
+        help="Path to the root folder"
+    )
+    args = parser.parse_args()
+    root=args.root
+    return root
+
+def main():
+    root=parse_args()
+    import_dataset(root=root)
+
+if __name__ == "__main__":
+    main()
