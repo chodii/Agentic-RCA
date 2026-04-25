@@ -67,160 +67,39 @@ class DB_Tools:
     
 
 
-def compact_rows(rows, max_rows=5, max_preview_chars=300):
-    out = []
-    for r in rows[:max_rows]:
-        d = dict(r)
-        out.append({
-            "id": d.get("id"),
-            "source_path": d.get("source_path"),
-            "chunk_id": d.get("chunk_id"),
-            "time_start": str(d.get("time_start")),
-            "time_end": str(d.get("time_end")),
-            "preview": str(d.get("content_json"))[:max_preview_chars],
-        })
-    return out
-
-
-def old_run_rca(user_problem: str, tool_schemas, displatcher):
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are an RCA investigator. Break the problem into small steps. "
-                "Use tools to retrieve only the next needed evidence. "
-                "Maintain a timeline, hypotheses, supporting evidence, "
-                "contradicting evidence, and open questions. "
-                "Do not conclude until evidence is sufficient."
-                "Be aware, you have just 10 iterations to complete your task."
-            ),
-        },
-        {"role": "user", "content": user_problem},
-    ]
-    it = 0
-    max_iter = 10
-    last_calls = 0
+import message_manager
+def run_rca(user_problem: str, tool_schemas):
+    displatcher = DB_Tools()
+    messanger = message_manager.MessageManager(user_problem
+                                               , db_manager=displatcher
+                                               , max_iter = 10
+                                               , gpt=gpt_connector.ask_open_router)
     while True:
-        if it >= max_iter:
+        if messanger.force_end:
             break
-        it += 1
-        resp = gpt_connector.ask_open_router(messages=messages, tools=tool_schemas)
-
+        resp = gpt_connector.ask_open_router(messages=messanger.messages
+                                             , tools=tool_schemas)
         assistant_message = resp["choices"][0]["message"]
-        tool_calls = assistant_message.get("tool_calls", [])
-        if assistant_message.get("content") is not None:
-            print(">:",assistant_message["content"])
-        if assistant_message.get("reasoning") is not None:
-            print("-:"+str(assistant_message["reasoning"])+"\n")
-        print("->"+str(tool_calls)+"<-\n\n","round",it,"\n","="*32)
-        for i in range(last_calls):
-            messages.pop(-1)
-        print(len(messages),"msgs")
-        last_calls = len(tool_calls)
-        if tool_calls:
-            # Keep the assistant tool-call message in history
-            messages.append({
-                "role": "assistant",
-                "content": assistant_message.get("content", "reasoning"),
-                "tool_calls": tool_calls,
-            })
+        messanger.add_response(assistant_message)
 
-            for call in tool_calls:
-                result = displatcher.dispatch_tool(call)
-                print("<:",str(result)[100:300])
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": call["id"],
-                    #"content": json.dumps(result),
-                    "content": json.dumps(result, default=str),
-                })
+        return assistant_message, messanger.messages#.get("content", "")
 
-            continue
-
-        return assistant_message, messages#.get("content", "")
-
-
-def run_rca(user_problem: str, tool_schemas, displatcher):
-    evidence_bank = {}   # evidence_id -> full raw result
-    working_summary = ""
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are an RCA investigator. Break the problem into small steps. "
-                "Use tools to retrieve only the next needed evidence. "
-                "Maintain a timeline, hypotheses, supporting evidence, "
-                "contradicting evidence, and open questions. "
-                "Do not conclude until evidence is sufficient."
-                "Be aware, you have just 10 iterations to complete your task."
-            ),
-        },
-        {"role": "user", "content": user_problem},
-    ]
-    it = 0
-    max_iter = 10
-    last_calls = 0
-    while True:
-        if it >= max_iter:
-            break
-        it += 1
-        resp = gpt_connector.ask_open_router(messages=messages, tools=tool_schemas)
-
-        assistant_message = resp["choices"][0]["message"]
-        tool_calls = assistant_message.get("tool_calls", [])
-        if assistant_message.get("content") is not None:
-            print(">:",assistant_message["content"])
-        if assistant_message.get("reasoning") is not None:
-            print("-:"+str(assistant_message["reasoning"])+"\n")
-        print("->"+str(tool_calls)+"<-\n\n","round",it,"\n","="*32)
-        for i in range(last_calls):
-            messages.pop(-1)
-        print(len(messages),"msgs")
-        last_calls = len(tool_calls)
-        if tool_calls:
-            messages.append({
-                "role": "assistant",
-                "content": assistant_message.get("content"),
-                "tool_calls": tool_calls,
-            })
-        
-            compact_for_model = []
-        
-            for call in tool_calls:
-                result = displatcher.dispatch_tool(call)
-        
-                evidence_id = f"ev_{it}_{call['id']}"
-                evidence_bank[evidence_id] = result
-        
-                compact = {
-                    "evidence_id": evidence_id,
-                    "result_count": len(result) if isinstance(result, list) else 1,
-                    "top_matches": compact_rows(result if isinstance(result, list) else [result]),
-                }
-                compact_for_model.append(compact)
-        
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": call["id"],
-                    "content": json.dumps(compact, default=str, ensure_ascii=False),
-                })
-            continue
-        print("working summary:",working_summary)
-        return assistant_message, messages#.get("content", "")
 
 
 def main():
     #root = parse_args()
-    displatcher = DB_Tools()
-    with open(file="./AlstAI-tools.json", mode="r", encoding="utf-8") as fp:
-        tool_schemas = json.load(fp)
-    print("Processing Root Cause Analysis")
-    #gpt_connector.ask_open_router(messages=[{"role":...,"content":...}])
-    user_problem = "You are a helpful assistant which performes Root Cause Analysis."
-    rca, messages = run_rca(user_problem, tool_schemas, displatcher)
-    with open("last_chat.json", mode="w", encoding="utf-8") as fp:
-        json.dump(messages, fp, default=str)
+    rca = api()
     print("The root cause analysis of the issue is:", rca)
+
+def api(tools = "./AlstAI-tools.json"
+        , result_log = "last_chat.json"):
+    with open(file=tools, mode="r", encoding="utf-8") as fp:
+        tool_schemas = json.load(fp)
+    #gpt_connector.ask_open_router(messages=[{"role":...,"content":...}])
+    rca, messages = run_rca(tool_schemas)
+    with open(result_log, mode="w", encoding="utf-8") as fp:
+        json.dump(messages, fp, default=str)
+    return rca
 
 if __name__ == "__main__":
     main()

@@ -23,6 +23,13 @@ import requests
 import json
 def ask_open_router(messages, tools):
     API_KEY = os.environ["OPENROUTER"]
+    data_content = {
+          "model": "openai/gpt-5.2", # Optional
+          "messages": messages
+          
+        }
+    if tools:
+        data_content["tools"] = tools
     response = requests.post(
       url="https://openrouter.ai/api/v1/chat/completions",
       headers={
@@ -31,11 +38,7 @@ def ask_open_router(messages, tools):
         #"X-OpenRouter-Title": "<YOUR_SITE_NAME>", # Optional. Site title for rankings on openrouter.ai.
         
         },
-      data=json.dumps({
-        "model": "openai/gpt-5.2", # Optional
-        "messages": messages
-        ,"tools":tools
-      })
+      data=json.dumps(data_content)
     )
     #return response
     response.raise_for_status()
@@ -45,11 +48,3 @@ def ask_open_router(messages, tools):
         response.raise_for_status()
 
     return response.json()
-
-def main():
-    messages = [{"role":"system", "content":"Don't act weird."}, {"role":"user", "content":"What is the airi speed velocity of unloaden swallow?"}]
-    res = ask_open_router(messages)
-    for l in res.iter_content(100):
-        print(l,"\n")
-if __name__ == "__main__":
-    main()
