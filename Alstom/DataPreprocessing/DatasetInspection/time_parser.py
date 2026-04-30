@@ -163,16 +163,16 @@ PARSERS: list[tuple[str, re.Pattern, Callable[[str, ZoneInfo], Optional[datetime
 # ----------------------------
 
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 def normalize_line_extract_time(
     line: str,
-    anchor: path_parser.Anchor,
-    tz_name: str = "Europe/London"
+    anchor: path_parser.Anchor
+    #,tz_name: str = "Europe/London"
 ) -> Tuple[str, Optional[datetime], Optional[str]]:
     s = line.rstrip("\n")
-    tz = ZoneInfo(tz_name)
+    tz = timezone.utc#ZoneInfo(tz_name)
 
     for pid, rx, parse_fn in PARSERS:
         m = rx.search(s)

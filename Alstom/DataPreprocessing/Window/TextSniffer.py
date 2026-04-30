@@ -18,11 +18,11 @@ import json
 from collections import Counter, defaultdict
 
 def find_events(text
-                ,root = "C:\\Datasets\\MonLis\\"#"CRO_NOSS_Example\\"
+                ,root#"CRO_NOSS_Example\\"
                 ):
     # ^ the only parameter
     
-    time_end = datetime(2026,3,3,11,45,0,tzinfo=timezone.utc)
+    time_end = datetime(2026,4,3,11,45,0,tzinfo=timezone.utc)
     time_start = datetime(2000,1,1,11,45,0,tzinfo=timezone.utc)
     events = {}
     dates = []
@@ -42,11 +42,15 @@ def find_events(text
     return dates, events
 
 def main():
+    root = "C:\\Datasets\\MonLis\\"
+    api(root)
+
+def api(root):
     #text="watchdog"
     json_id="-EMERGENCY-MPSPThreads-Restart"
     text="EMERGENCY:MPSPThreads::Restart"
     #text="External watchdog timeout"
-    dates, events = find_events(text)
+    dates, events = find_events(text, root=root)
     # 1) Order dates and print them
     dates.sort()
 
@@ -74,12 +78,13 @@ def main():
     # sort by timestamp before saving
     sorted_events = dict(sorted(events.items()))
     os.makedirs("out", exist_ok=True)
-    with open("out/events"+json_id+".json", "w", encoding="utf-8") as f:
+    out_file="out/events"+json_id+".json"
+    with open(out_file, "w", encoding="utf-8") as f:
         json.dump(sorted_events, f, indent=2, ensure_ascii=False)
-
-    print(f"\nSaved {len(sorted_events)} timestamps to events.json")
+    out_file = os.path.abspath(out_file)
+    print(f"\nSaved {len(sorted_events)} timestamps to ",out_file)
     print(f"Total matching lines: {sum(len(v) for v in sorted_events.values())}")
-
+    return out_file
 
 if __name__ == "__main__":
     main()

@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import DatasetInspection.time_parser as TP
 import DatasetInspection.path_parser as PP
 
-INCLUDE_STATIC_FILES=False
+INCLUDE_STATIC_FILES=True
 
 STATISTICS_COUNTER = None
 
@@ -20,7 +20,25 @@ def reset_counter():
                         ,"extracted":0
                         , "missed":0
                         ,"ERROR":0}
-
+        
+def all_from_line(raw_line, res, time_anchor, ext_time):
+    raw_line = raw_line.strip()
+    if len(raw_line) == 0:
+        return ext_time# empty line
+    proc_line, time, proctid = TP.normalize_line_extract_time(raw_line, time_anchor)
+    if time is not None:
+        ext_time=time
+        res.append([time, proc_line])
+        return ext_time
+    if ext_time is None:
+        if time_anchor is not None:
+            res.append([time_anchor.dt, proc_line])
+            return ext_time
+        if INCLUDE_STATIC_FILES:
+            res.append([None, proc_line])# static part of a file
+    # there is some previous event this belongs to
+    res[-1][1] = res[-1][1] +"\n"+proc_line
+    return ext_time
 
 def all_from_log(file_path, time_anchor=None, encoding="utf-8"):
     res = []
@@ -30,23 +48,7 @@ def all_from_log(file_path, time_anchor=None, encoding="utf-8"):
         time_anchor = PP.extract_best_anchor_from_path(file_path or "")
         try:
             for line_no, raw_line in enumerate(f, start=1):
-                raw_line = raw_line.strip()
-                if len(raw_line) == 0:
-                    continue# empty line
-                proc_line, time, proctid = TP.normalize_line_extract_time(raw_line, time_anchor)
-                if time is not None:
-                    ext_time=time
-                    res.append([time, proc_line])
-                    continue
-                if ext_time is None:
-                    if time_anchor is not None:
-                        res.append([time_anchor.dt, proc_line])
-                        continue
-                    if INCLUDE_STATIC_FILES:
-                        res.append([None, proc_line])# static part of a file
-                # there is some previous event this belongs to
-                res[-1][1] = res[-1][1] +"\n"+proc_line
-                continue
+                ext_time = all_from_line(raw_line, res, time_anchor, ext_time)
         except Exception as e:
             if STATISTICS_COUNTER is not None:
                 STATISTICS_COUNTER["ERROR"]+=1
@@ -136,5 +138,25 @@ def window_from_log(file_path, time_start, time_end, time_anchor=None, encoding=
         return None
     return res
 
+def all_from_text(text:str):
+    """
+    Extracts log lines from @param text. 
 
+    Parameters
+    ----------
+    text : TYPE
+        DESCRIPTION.
+
+    Returns extracted log-lines [time_ISO, <time> line]
+    -------
+    res : TYPE
+        DESCRIPTION.
+
+    """
+    res = []
+    ext_time = None
+    time_anchor=None
+    for raw_line in text.split("\n"):
+        ext_time = all_from_line(raw_line, res, time_anchor, ext_time)
+    return res
 

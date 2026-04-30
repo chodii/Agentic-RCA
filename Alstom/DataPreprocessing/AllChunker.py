@@ -12,8 +12,11 @@ import argparse
 import json
 from datetime import datetime, timedelta
 
-import AlstomAnalyst
-from Visualizations import time_diffs
+from DataPreprocessing import AlstomAnalyst
+from DataPreprocessing import Matchmaker
+from DataPreprocessing.Visualizations import time_diffs
+
+from DataPreprocessing.Visualizations import line_lengths_hists
 
 MIN_SCORE = 8
 def get_incident_root(root, match, ts, DEPTH=3):
@@ -21,7 +24,7 @@ def get_incident_root(root, match, ts, DEPTH=3):
     incident_root = root
     for i in range(min(DEPTH, len(root_parts))):
         incident_root = os.path.join(incident_root, root_parts[i]+"\\")
-    print("searching", incident_root,  str(datetime.fromisoformat(ts)))
+    #print("\rsearching", incident_root,  str(datetime.fromisoformat(ts)),end="")
     return incident_root
 
 
@@ -51,15 +54,16 @@ def unmatch(match, ts):
     #    print("skipping", str(datetime.fromisoformat(ts)))
     #    return True# skip, not fully matching
     ts_formated = ts.split("+")[0].replace("T", " ")
-    print("Matching", ts_formated)
     cells = match.get("row",{}).get("row_values",[])
     if cells is None or len(cells) == 0:
+        print("\nUnmatching", ts_formated)
         return True
     for val in cells:
         if type(val) is not str:
             continue
         if ts_formated in val:
             return False# definitely this time! :)
+    print("\nUnmatching", ts_formated)
     return True
 
 from datetime import timezone
@@ -93,23 +97,24 @@ def read_times_file(times_file, root, time_differences, incidents):
         diff = time_diffs.signed_difference_record(reported_time, actual_time)
         time_differences.append(diff)
         incident_root = get_incident_root(root, match, ts)
-        incident_time = reported_time
+        incident_time = actual_time#reported_time
         
         entry["mapped_date"] = reported_time.isoformat()
         incidents[str(ts)]=entry
         
-        yield incident_time, incident_root, entry
+        yield reported_time, incident_time.isoformat(), incident_root, entry
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Give me the time, I'll give you files and tell you where to start."
+        description="If no --time_file, then --xlsx_file shall help it map incidents from --root. Furthermore performs chunking and can perform anomally detection. Besides that can perform --line_analysis."
     )
     parser.add_argument(
         "-r", "--root",
         dest="root",
         type=str,
-        required=True,
+        #required=True,
+        default=None,
         help="Path to the root folder"
     )
     parser.add_argument(
@@ -123,8 +128,25 @@ def parse_args():
         "-t", "--time_file",
         dest="time_file",
         type=str,
-        required=True,
+        #required=True,
+        default=None,
         help="Path to the time_file"
+    )
+    parser.add_argument(
+        "-x", "--xlsx_file",
+        dest="xlsx_file",
+        type=str,
+        #required=True,
+        default=None,
+        help="Path to the incidents file"
+    )
+    parser.add_argument(
+        "-c", "--chunk_max",
+        dest="chunk_max",
+        type=int,
+        #required=True,
+        default=1000,
+        help="Maximal chunk size in characters"
     )
     
     parser.add_argument(
@@ -134,49 +156,109 @@ def parse_args():
         , help="Detect anomalies"
     )
     
+    parser.add_argument(
+        "-lanal", "--line_analysis",
+        dest="line_analysis",
+        action="store_true"
+        , help="Perform line analysis"
+    )
+    
     args = parser.parse_args()
-    return args.root, args.dest, args.time_file, args.det_anom
+    time_file = args.time_file
+    if time_file is None:
+        time_file = Matchmaker.api(root=args.root, xlsx_file=args.xlsx_file)#root = "C:\\Datasets\\MonLis\\"
+    return args.root, args.dest, time_file, args.det_anom, args.line_analysis, args.chunk_max
 
 
 def main():
-    root, dest, times_file, det_anom = parse_args()
-    api(root, dest, times_file, anomally_detection=det_anom)
+    root, dest, times_file, det_anom, lanal, CHUNK_SIZE = parse_args()
+    if root:
+        api(root=root, dest=dest, times_file=times_file, CHUNK_SIZE=CHUNK_SIZE, anomally_detection=det_anom)
+    else:
+        print("No destination specified.")
+    if lanal:
+        print("Performing line analysis...")
+        line_analysis_api(times_file=times_file, dest_root=dest)
 
-def api(root, dest, times_file, anomally_detection=False, CHUNK_SIZE = 5000, inc_json = "chunked_incidents.json"):
-    SPAN_START = timedelta(days=1)
-    SPAN_AFTER_END = timedelta(days=1)
+SPAN_START = timedelta(days=1)
+SPAN_AFTER_END = timedelta(days=1)
+
+def line_analysis_api(times_file, dest_root):
+    time_differences = []
+    line_lengths = []
+    incidents = {}
+    import matplotlib as mtl
+    font = {#'family' : 'normal',
+            #'weight' : 'normal',
+            'size'   : 12}
+    mtl.rc('font', **font)
+    for reported_time, _incident_ts, incident_root, entry in read_times_file(times_file
+                                                        , dest_root
+                                                        , time_differences
+                                                        , incidents):
+        time_start = reported_time - SPAN_START
+        time_end = reported_time + SPAN_AFTER_END
     
-    
+        incidents_line_len = AlstomAnalyst.line_lens_analysis_api(dest_root
+                                                            , ts_mark=_incident_ts
+                                                            , time_start=time_start
+                                                            , time_end=time_end)
+        line_lengths.extend(incidents_line_len)
+    line_lengths_hists.plot_line_length_hist_grid(line_lengths=line_lengths
+                                                  ,out_path="out/line-lengths-grid.pdf"
+                                                  ,show=False)
+    for OUTLIER_LIMIT in [500, 1000, 2000, 3000, 4000, 5000, 10000]:
+        line_lengths_hists.plot_line_length_hist_with_outlier_bin(line_lengths=line_lengths
+                                                              , OUTLIER_LIMIT=OUTLIER_LIMIT
+                                                              ,out_path="out/line-lengths-outliers"+str(OUTLIER_LIMIT)+".pdf"
+                                                              ,show=False)
+    for c in [True, False]:
+        line_lengths_hists.plot_line_length_cdf(line_lengths=line_lengths
+                                            ,show=False
+                                            ,out_path="out/line-lengths-cumulative"+str(c)+".pdf"
+                                            ,complementary=c)
+
+def api(root, dest
+        , times_file, CHUNK_SIZE, anomally_detection=False
+        , inc_json = "out/chunked_incidents.json"
+        , LIMIT_CONTENT=True):
     time_differences = []
     chuns = []
     incidents = {}
-    for incident_time, incident_root, entry in read_times_file(times_file
+    for reported_time, _incident_ts, incident_root, entry in read_times_file(times_file
                                                         , root
                                                         , time_differences
                                                         , incidents):
-        time_start = incident_time - SPAN_START
-        time_end = incident_time + SPAN_AFTER_END
+        time_start = reported_time - SPAN_START
+        time_end = reported_time + SPAN_AFTER_END
 
         chunk_sizes, anomalies, chunk_dest = AlstomAnalyst.api(
             incident_root,
             dest,
             time_start,
             time_end,
-            chunk_size=CHUNK_SIZE
+            ts_mark=_incident_ts
+            ,chunk_size=CHUNK_SIZE
             , INCLUDE_STATIC_FILES=True
             , anom_detect=anomally_detection
+            , LIMIT_CONTENT=LIMIT_CONTENT
         )
         chuns.extend(chunk_sizes)
         entry["anomalies"] = anomalies
         entry["chunked_destination"]  = chunk_dest
-        print("\nINCIDENTS:",len(incidents),"\n")
+        print("\rINCIDENTS:",len(incidents), end="")
     import Visualizations.hist as Viz_Hist
     Viz_Hist.hist_from_array(chuns, x="Chunk Size", y="Frequency", title="Chunk Sizes", show=True)
     time_diffs.plot_difference_histograms(time_differences, unit="hours", bins=30, title="Reported vs actual time")
     import json
+    
+    inc_json = os.path.abspath(inc_json)
+    os.makedirs(os.path.dirname(inc_json), exist_ok=True)
     with open(inc_json, "w", encoding="utf-8") as fp:
         json.dump(incidents, fp,
         default=str)
+    print("Finished, results were written into:", inc_json)
+    return inc_json
     
 if __name__ == "__main__":
     main()

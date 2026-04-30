@@ -8,7 +8,7 @@ Created on Wed Apr 15 12:04:30 2026
 from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
-
+import os
 
 def is_date_only(dt: datetime) -> bool:
     return (
@@ -61,5 +61,7 @@ def plot_difference_histograms(records, unit="minutes", bins=50, title="Time dif
 
     fig.suptitle(title)
     plt.tight_layout()
-    plt.savefig("./time-diff.pdf")
+    res_pdf = "./out/time-diff.pdf"
+    os.makedirs(os.path.dirname(res_pdf), exist_ok=True)
+    plt.savefig(res_pdf)
     plt.show()

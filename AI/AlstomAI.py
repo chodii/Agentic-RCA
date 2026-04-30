@@ -8,7 +8,8 @@ Created on Tue Apr  7 11:39:56 2026
 
 import os, sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import gpt_connector
+from AI import gpt_connector
+from AI import message_manager
 from Alstom.Database import db_fetcher
 
 from datetime import datetime, timedelta
@@ -56,7 +57,13 @@ class DB_Tools:
             return self.record_selector(**args)
         raise ValueError(f"Unknown tool: {tool_name}")
     
-    def record_selector(self, source_path, start_ts, end_ts, exact_pattern, similarity_pattern, limit):
+    def record_selector(self
+                        , source_path=None
+                        , start_ts=None
+                        , end_ts=None
+                        , exact_pattern=None
+                        , similarity_pattern=None
+                        , limit=1):
         recs = db_fetcher.get_file_time_pattern(source_path
                                   , start_ts
                                   , end_ts
@@ -67,36 +74,54 @@ class DB_Tools:
     
 
 
-import message_manager
-def run_rca(user_problem: str, tool_schemas):
+def run_rca(user_problem: str, tool_schemas, system_prompt_pth, context_manager):
     displatcher = DB_Tools()
-    messanger = message_manager.MessageManager(user_problem
-                                               , db_manager=displatcher
-                                               , max_iter = 10
-                                               , gpt=gpt_connector.ask_open_router)
-    while True:
-        if messanger.force_end:
-            break
-        resp = gpt_connector.ask_open_router(messages=messanger.messages
-                                             , tools=tool_schemas)
-        assistant_message = resp["choices"][0]["message"]
-        messanger.add_response(assistant_message)
-
-        return assistant_message, messanger.messages#.get("content", "")
+    messanger = message_manager.MessageManager(
+                db_manager = displatcher
+                 , system_prompt_pth = system_prompt_pth
+                 , context_management_strategy = context_manager
+                 , gpt = gpt_connector.ask_open_router)
+    messanger.init_problem(user_problem=user_problem)
+    try:
+        while True:
+            if messanger.force_end:
+                break
+            if messanger.about_to_end:
+                tool_schemas = None# I want you to talk --> therefore no tools
+            assistant_message = gpt_connector.ask_open_router(messages=messanger.messages
+                                                 , tools=tool_schemas)
+            messanger.add_response(assistant_message)
+    except Exception as e:
+        print("\nExcepted:",e)
+        return "-", messanger.messages
+    print()
+    return assistant_message, messanger.messages#.get("content", "")
 
 
 
 def main():
     #root = parse_args()
-    rca = api()
+    rca = api("Your mom")
     print("The root cause analysis of the issue is:", rca)
 
-def api(tools = "./AlstAI-tools.json"
-        , result_log = "last_chat.json"):
+from pathlib import Path
+def api(user_problem
+        , context_manager
+        , tools = "AlstAI-tools.json"
+        , system_prompt_pth = "AlstAI-prompts.json"):
+    MODULE_DIR = Path(__file__).resolve().parent
+    tools = str(MODULE_DIR)+"/"+tools
+    system_prompt_pth=str(MODULE_DIR)+"/"+system_prompt_pth
     with open(file=tools, mode="r", encoding="utf-8") as fp:
         tool_schemas = json.load(fp)
+    result_log = "out/last_chats"+datetime.now().strftime("%Y%m%d_%H%M%S")+".json"
     #gpt_connector.ask_open_router(messages=[{"role":...,"content":...}])
-    rca, messages = run_rca(tool_schemas)
+    
+    rca, messages = run_rca(user_problem=user_problem
+                            , tool_schemas=tool_schemas
+                            , system_prompt_pth=system_prompt_pth
+                            , context_manager=context_manager)
+    
     with open(result_log, mode="w", encoding="utf-8") as fp:
         json.dump(messages, fp, default=str)
     return rca

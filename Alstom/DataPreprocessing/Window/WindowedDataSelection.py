@@ -156,7 +156,7 @@ def extract_subset_plain(root, time_end, time_start, dest="C:\\Datasets\\process
 
 import json
 from Chunking import chunker
-def extract_subset_json(root, time_end, time_start, dest="C:\\Datasets\\processed\\monlisJ_", INCLUDE_STATIC_FILES=False):
+def extract_subset_json(root, time_end, time_start, dest, INCLUDE_STATIC_FILES):
     if time_start is None or time_end is None:
         print("Extracting information from across the all time, structured as JSON.")
     else:

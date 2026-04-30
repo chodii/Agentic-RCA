@@ -26,25 +26,33 @@ def get_wordsearch(pattern:str):
     FROM log_chunks
     WHERE content_text ILIKE '%{pattern}%'
     ORDER BY time_start
-    LIMIT 20;
+    LIMIT 10;
     """
     with psycopg2.connect(**DB_CONFIG) as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(query)
             return cur.fetchall()
+"""
 
-def get_fuzzy_search(pattern:str):
-    query=f"""
-        SELECT id, source_path, chunk_id, content_json, time_start, time_end,
-           similarity(content_text, 'invalid argument type') AS sim
-           FROM log_chunks
-           WHERE content_text % 'invalid argument type'
-           ORDER BY sim DESC
-           LIMIT 20;
-       """
+"""
+def get_fuzzy_search(pattern: str, threshold: float = 0.15, limit: int = 10):
+    query = """
+        SELECT
+            id,
+            source_path,
+            chunk_id,
+            content_json,
+            time_start,
+            time_end,
+            similarity(content_text, %s) AS sim
+        FROM log_chunks
+        WHERE similarity(content_text, %s) > %s
+        ORDER BY sim DESC
+        LIMIT %s;
+    """
     with psycopg2.connect(**DB_CONFIG) as conn:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(query)
+            cur.execute(query, (pattern, pattern, threshold, limit))
             return cur.fetchall()
         
 def exec_query(query, values):
@@ -62,21 +70,24 @@ def get_file_time_pattern(source_path:str=None
                           , exact_pattern:str=None
                           , elastic_pattern:str=None
                           , limit:int=1):
-    
+    qs = []
+    qv = []
     query="""
          SELECT id, source_path, chunk_id, content_json, time_start, time_end
         """
     qorder = " ORDER BY time_start"
     if elastic_pattern is not None:
-        #query += f", similarity(content_text, '{elastic_pattern}') AS sim"
+        query += f", similarity(content_text, %s) AS sim"
+        qv.append(elastic_pattern)
+        qs.append(f"similarity(content_text, %s) > %s")
+        qv.append(elastic_pattern)
+        qv.append(0.01)
+        qorder = f" ORDER BY sim DESC"
         #qorder = "ORDER BY sim"
-        qorder = f" ORDER BY similarity(content_text, '{elastic_pattern}')"
     query += """
          FROM log_chunks
         
         """
-    qs = []
-    qv = []
     
     if source_path is not None:
         qs.append(" source_path = %s")
@@ -86,11 +97,11 @@ def get_file_time_pattern(source_path:str=None
         qs.append(" has_time = True")
         
         if start_ts is not None:
-            qs.append(" time_start >= %s")
+            qs.append(" time_end >= %s")
             qv.append(start_ts)
             
         if end_ts is not None:
-            qs.append(" time_end <= %s")
+            qs.append(" time_start <= %s")
             qv.append(end_ts)
     
     if exact_pattern is not None:
@@ -107,7 +118,6 @@ def get_file_time_pattern(source_path:str=None
     query += f" LIMIT {limit}"
     query += ";"
     
-    print(query, qv)
     return exec_query(query, qv)
 
 
@@ -297,4 +307,9 @@ def main():
 if __name__ == "__main__":
     #main()
     ...
-    
+    get_file_time_pattern(    start_ts  ="2022-06-01T00:00:00Z"
+                                , end_ts="2022-06-01T23:59:59Z"
+                                 #,exact_pattern="Orbita Alert"
+                                 ,elastic_pattern="Orbita Alert"
+                                , limit=10)
+    #print(len(res))

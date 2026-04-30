@@ -5,7 +5,7 @@ Created on Thu Feb 19 00:50:32 2026
 @author: chodo
 """
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from dataclasses import dataclass
 from typing import Optional
@@ -121,12 +121,12 @@ def _update_best(
 
 # If your dataset is Swedish, Europe/Stockholm is probably the right default.
 def extract_best_anchor_from_path(
-    fp: str, tz_name: str = "Europe/London"
+    fp: str#, tz_name: str = "UTC"#"Europe/London"
 ) -> Optional[Anchor]:
     if not fp:
         return None
 
-    tz = ZoneInfo(tz_name)
+    tz = timezone.utc#ZoneInfo(tz_name)
 
     # Normalize separators and split into path parts
     parts = [p for p in fp.replace("/", "\\").split("\\") if p]

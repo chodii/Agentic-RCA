@@ -37,7 +37,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
-
+import os
 
 def load_module(module_path: Path, module_name: str):
     if not module_path.exists():
@@ -268,12 +268,12 @@ def build_final_matches(
     return {"stats": stats, "results": final}
 
 
-def main():
+def parse_args():
     parser = argparse.ArgumentParser(
         description="Run the full XLSX pipeline with best-row scoring by matched source log lines."
     )
-    parser.add_argument("xlsx_path", help="Path to the Excel workbook (.xlsx)")
-    parser.add_argument("source_json", help="Path to the source JSON whose top-level keys are timestamps")
+    parser.add_argument("xlsx_path", help="Path to the Excel workbook (.xlsx)", default=None)
+    parser.add_argument("source_json", help="Path to the source JSON whose top-level keys are timestamps", default=None)
     parser.add_argument(
         "--positions-out",
         default="xlsx_date_positions.json",
@@ -316,21 +316,41 @@ def main():
         help="Keep all rows tied for best score instead of only one row",
     )
     args = parser.parse_args()
+    return args.xlsx_path, args.source_json, args.positions_out, args.matches_out, args.hist_out, args.rows_out, args.final_out, args.include_empty, args.min_score, args.keep_ties
 
+def main():
+    xlsx_path, source_json, _positions_out, _matches_out, _hist_out, _rows_out, _final_out, _include_empty, _min_score, _keep_ties = parse_args()
+    api(xlsx_path, source_json, _positions_out, _matches_out, _hist_out, _rows_out, _final_out, _include_empty, _min_score, _keep_ties)
+
+def abs_out_file(base_dir, final_out):
+    final_out = str((base_dir / final_out).resolve()) if not Path(final_out).is_absolute() else str(Path(final_out).resolve())
+    return os.path.abspath(final_out)
+
+def api(xlsx_path, source_json
+        , positions_out="out/xlsx_date_positions.json"
+        , matches_out="out/json_date_matches.json"
+        , hist_out="out/json_dates_histogram.pdf"
+        , rows_out="out/matched_rows_candidates.json"
+        , final_out="out/source_date_row_matches_best.json"
+        , include_empty=False, min_score=1, keep_ties = False):
     base_dir = Path(__file__).resolve().parent
-
+    (base_dir / "out").mkdir(parents=True, exist_ok=True)
+    final_out = abs_out_file(base_dir, final_out)
+    if source_json is None or xlsx_path is None:
+        if not os.path.exists(final_out):
+            raise Exception("Error: the output does not exits")
+        return final_out
     mod_extract_positions = load_module(base_dir / "xlsx_extract_dates_rows.py", "xlsx_extract_dates_rows")
     mod_compare = load_module(base_dir / "xlsx_compare_dates.py", "xlsx_compare_dates")
     mod_extract_rows = load_module(base_dir / "xlsx_extract_matched_rows_trimmed.py", "xlsx_extract_matched_rows_trimmed")
-
-    xlsx_path = str(Path(args.xlsx_path).resolve())
-    source_json = str(Path(args.source_json).resolve())
-    positions_out = str((base_dir / args.positions_out).resolve()) if not Path(args.positions_out).is_absolute() else str(Path(args.positions_out).resolve())
-    matches_out = str((base_dir / args.matches_out).resolve()) if not Path(args.matches_out).is_absolute() else str(Path(args.matches_out).resolve())
-    hist_out = str((base_dir / args.hist_out).resolve()) if not Path(args.hist_out).is_absolute() else str(Path(args.hist_out).resolve())
-    rows_out = str((base_dir / args.rows_out).resolve()) if not Path(args.rows_out).is_absolute() else str(Path(args.rows_out).resolve())
-    final_out = str((base_dir / args.final_out).resolve()) if not Path(args.final_out).is_absolute() else str(Path(args.final_out).resolve())
-
+    
+    xlsx_path = str(Path(xlsx_path).resolve())
+    source_json = str(Path(source_json).resolve())
+    positions_out = str((base_dir / positions_out).resolve()) if not Path(positions_out).is_absolute() else str(Path(positions_out).resolve())
+    matches_out = str((base_dir / matches_out).resolve()) if not Path(matches_out).is_absolute() else str(Path(matches_out).resolve())
+    hist_out = str((base_dir / hist_out).resolve()) if not Path(hist_out).is_absolute() else str(Path(hist_out).resolve())
+    rows_out = str((base_dir / rows_out).resolve()) if not Path(rows_out).is_absolute() else str(Path(rows_out).resolve())
+    
     print("[1/4] Extracting Excel datetime positions...")
     positions = mod_extract_positions.extract_date_positions(xlsx_path)
     with open(positions_out, "w", encoding="utf-8") as f:
@@ -364,7 +384,7 @@ def main():
     candidate_rows = mod_extract_rows.extract_rows(
         xlsx_path=xlsx_path,
         targets_by_sheet_name=targets_by_sheet_name,
-        include_empty=args.include_empty,
+        include_empty=include_empty,
     )
     with open(rows_out, "w", encoding="utf-8") as f:
         json.dump(candidate_rows, f, ensure_ascii=False, indent=2)
@@ -380,8 +400,8 @@ def main():
         rows_by_date=rows_by_date,
         matched_date_set=matched_date_set,
         mod_compare=mod_compare,
-        min_score=args.min_score,
-        keep_ties=args.keep_ties,
+        min_score=min_score,
+        keep_ties=keep_ties,
     )
 
     with open(final_out, "w", encoding="utf-8") as f:
@@ -396,7 +416,7 @@ def main():
     print("Done.")
     print(f"Final output: {final_out}")
     print(f"Intermediate files: {positions_out}, {matches_out}, {hist_out}, {rows_out}")
-
+    return os.path.abspath(final_out)
 
 if __name__ == "__main__":
     try:

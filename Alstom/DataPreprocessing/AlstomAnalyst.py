@@ -7,8 +7,8 @@ Created on Thu Mar 19 00:50:41 2026
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-import Window.WindowedDataSelection as WindowedDataSelection
-import Window.TextSniffer as TextSniffer
+import DataPreprocessing.Window.WindowedDataSelection as WindowedDataSelection
+from DataPreprocessing.Window import TextSniffer
 
 import argparse
 from datetime import datetime, timedelta
@@ -91,36 +91,46 @@ def identify_anomalies(src):
             incidence_list[t] = events_of_log
     sorted_events = dict(sorted(events.items()))
     return sorted_events
-    
-def api(root, dest
-        , time_start, time_end
-        , chunk_size, INCLUDE_STATIC_FILES=False
-        , override=False, anom_detect=False):
+
+def line_lens_analysis_api(dest_root,ts_mark, time_start, time_end):
+    _, winsel_dest = decide_destination(dest_root,ts_mark, time_start, time_end)
+    if (not os.path.exists(winsel_dest)):
+        raise Exception("Error: Doestination does not exist!")
+    line_lengths = Chunking.chunker.line_lengths(winsel_dest)
+    return line_lengths
+
+def decide_destination(dest,ts_mark, time_start, time_end):
     if time_start is not None and time_end is not None:
-        dest = dest+time_start.isoformat()[:10]
+        dest = dest+ts_mark.replace(":","-")
     else:
         dest = dest+"None"
     winsel_dest = os.path.join(dest,FOLDER_PREPROCESSED)
+    return dest, winsel_dest
+
+def api(root, dest
+        , time_start, time_end
+        ,ts_mark, chunk_size, INCLUDE_STATIC_FILES=False
+        , override=False, anom_detect=False, LIMIT_CONTENT=True):
+    dest, winsel_dest = decide_destination(dest,ts_mark, time_start, time_end)
     if override or (not os.path.exists(dest)):
-        print("Selecting\n")
+        #print("Selecting\n")
         #winsel_dest = 
         WindowedDataSelection.extract_subset_json(root
                                                 , time_end
                                                 , time_start
                                                 , dest=winsel_dest
                                                 , INCLUDE_STATIC_FILES=INCLUDE_STATIC_FILES)#                                            
-    else:
-        print("Selection exists, skipping\n")
     if anom_detect:
-        print("Identifying anomalies within the time window")
+        #print("Identifying anomalies within the time window")
         anomalies = identify_anomalies(src=winsel_dest)
-        print("Anomalies detected:",len(anomalies))
+        #print("Anomalies detected:",len(anomalies))
     else:
         anomalies = []        
     chunk_dest = os.path.join(dest,FOLDER_CHUNKED+str(chunk_size))
     chunk_sizes = Chunking.chunker.chunk_dataset(src=winsel_dest
                                                  , dest=chunk_dest
-                                                 , max_chunk_len=chunk_size)
+                                                 , max_chunk_len=chunk_size
+                                                 , LIMIT_CONTENT=LIMIT_CONTENT)
     return chunk_sizes, anomalies, chunk_dest
 
 def main():

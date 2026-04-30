@@ -21,11 +21,27 @@ def ask_open_ai():
 
 import requests
 import json
-def ask_open_router(messages, tools):
+import time
+def ask_open_router(messages, tools=None):
+    time.sleep(10)
     API_KEY = os.environ["OPENROUTER"]
+    #model = "openai/gpt-5.2"
+    model="openai/gpt-4o-mini"
+    #model="openai/gpt-5-mini"
+    
+    #model = "xiaomi/mimo-v2.5-pro"
+    #model = "xiaomi/mimo-v2.5"
+    
+    #model="google/gemma-4-31b-it:free"
+    #model="google/gemma-4-26b-a4b-it:free"
     data_content = {
-          "model": "openai/gpt-5.2", # Optional
-          "messages": messages
+          #"model": "openai/gpt-5.2" # Optional
+          #"model":"inclusionai/ling-2.6-1t:free"
+          #"model":"nvidia/nemotron-3-super-120b-a12b:free"
+          #"model":"openai/gpt-4o-mini"
+          #"deepseek/deepseek-v4-flash"
+          "model":model
+          ,"messages": messages
           
         }
     if tools:
@@ -47,4 +63,7 @@ def ask_open_router(messages, tools):
         print("BODY:", response.text)
         response.raise_for_status()
 
-    return response.json()
+    model_response = response.json()
+    model_response = model_response["choices"][0]["message"]
+    print("...")
+    return model_response
