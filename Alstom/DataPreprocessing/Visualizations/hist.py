@@ -8,10 +8,14 @@ import os
 import re
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 
 DEST = "./out/"
 
 def hist_from_array(array, x, y, title, bins=30, show=False):
+    font = {'size'   : 16}
+    matplotlib.rc('font', **font)
+    
     os.makedirs(DEST, exist_ok=True)
 
     data = np.asarray(array, dtype=float)
@@ -45,15 +49,16 @@ def hist_from_array(array, x, y, title, bins=30, show=False):
 
     return out_path
 
-
 def hist_from_array_single(array, x, y, title, bins=30, show=False):
+    font = {'size'   : 16}
+    matplotlib.rc('font', **font)
     print("\n",title,"\tmean:", sum(array)/len(array))
     os.makedirs(DEST, exist_ok=True)
 
     data = np.asarray(array, dtype=float)
     data = data[np.isfinite(data)]  # remove NaN / inf
     # if OUTLIERS is not None: plot data < OUTLIERS normally and group all data>OUTLIERS into the most right column that says outliers
-    fig, (ax1) = plt.subplots(1, 1, figsize=(10, 10))
+    fig, (ax1) = plt.subplots(1, 1, figsize=(12, 6))
     
     # Normal histogram
     ax1.hist(data, bins=bins, edgecolor="black")

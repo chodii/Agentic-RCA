@@ -14,7 +14,7 @@ import os, sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from AI import AlstomAI
 from AI import message_manager
-
+import json
 import argparse
 
 def coverage_analysis(old, new, tag):
@@ -23,7 +23,8 @@ def coverage_analysis(old, new, tag):
         cov = (new[i])/old[i]
         covs.append(cov)
     hist.hist_from_array_single(covs, x="Coverage of target output", y="Count", title="Potential "+tag+" coverage of target output")
-    
+    return covs
+
 def coverage_analysis_api(incidents_json):
     lens_orig = []
     word_lens_orig = []
@@ -33,7 +34,7 @@ def coverage_analysis_api(incidents_json):
     word_lens_new = []
     line_lnes_new = []
     line_2_lnes_new = []
-    
+    incident_relevant_files = {}
     for i,incident in enumerate(IssueLoader.load_incidents(incidents_json=incidents_json)):
         print("\r",i,incident.__str__(),end="")
         srcs = incident.chunk_folder.replace("\\","/").split("/")[:-1]
@@ -43,10 +44,17 @@ def coverage_analysis_api(incidents_json):
         src += "windowed_selection/"
         target = incident.get_target()
         target_manager = evaluate_IR.target_manager(target)
+        contained_fp = []
         for fp in dw.dataset_iterator(src):
+            contained = False
             for line in IssueLoader.log_file_reader(fp):
                 target_manager.log_in_line(line)
                 target_manager.log_in_word(line)
+                if target_manager.log_in_line2(line):
+                    contained = True
+            if contained:
+                contained_fp.append(fp)
+        incident_relevant_files[incident.ts] = contained_fp
         old_str_len, new_str_len, old_word_len, new_word_len, old_line_len, new_line_len, new_len_line_target_2 = target_manager.result()
         lens_orig.append(old_str_len)
         word_lens_orig.append(old_word_len)
@@ -60,8 +68,10 @@ def coverage_analysis_api(incidents_json):
     hist.hist_from_array_single(line_lens_oring, x="Length of target output", y="Count", title="Length of target [lines]")
     coverage_analysis(lens_orig, lens_new, "character")
     coverage_analysis(word_lens_orig, word_lens_new, "word")
-    coverage_analysis(line_lens_oring, line_lnes_new, "line (exact) ")
-    coverage_analysis(line_lens_oring, line_2_lnes_new, "line (contained) ")
+    coverage_analysis(line_lens_oring, line_lnes_new, "line exact")
+    l2l_cov = coverage_analysis(line_lens_oring, line_2_lnes_new, "line contained")
+    with open("out/coverage_analysis.json", mode="w", encoding="utf-8") as fp:
+        json.dump({"files":incident_relevant_files,"l2l_coverage":l2l_cov}, fp)
     
 def api(context_manager, incidents_json):
     #incident=None

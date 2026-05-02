@@ -62,39 +62,49 @@ class target_manager:
     def __init__(self, target:str):
         self.target = target# 100% word coverage
         self.line_target = target.split("\n")# 60% line coverage
+        self.found_lines = []
         self.line_target_2 = target.split("\n")
         self.found_lines2 = []
         # len:
         self._len_word_target = _word_len(target)
         self._len_target = len(target)
         self._len_line_target = len(self.line_target)
-    
+        # counters:
+        self._counter_word = 0
+        self._counter_subline = 0
+        
     def log_in_line(self, line):
         new_line_target = []
         for i in range(len(self.line_target)):
-            if not self.line_target[i] == line:
+            if self.line_target[i].strip() == line.strip():
+                self.found_lines.append(self.line_target[i])
+            else:
                 new_line_target.append(self.line_target[i])
         self.line_target = new_line_target
     
     def log_in_line2(self, line):
         """ line: <line>
         """
+        contribution = False
         new_line_target = []
         for i in range(len(self.line_target_2)):
             if line in self.line_target_2[i]:
                 self.found_lines2.append(line)
+                contribution = True
             else:
                 new_line_target.append(self.line_target_2[i])
         self.line_target_2 = new_line_target
+        return contribution
     
     def log_in_word(self, line):
         for word in line.split(" "):
-            self.target.replace(word, "")
+            self.target = self.target.replace(" "+word+" ", "")# sole words
     
     
     def result(self):
-        new_len_target = len(self.target)
-        new_len_line_target = len(self.line_target)
-        new_len_line_target_2 = len(self.line_target_2)
-        return self._len_target, new_len_target, self._len_word_target, _word_len(self.target), self._len_line_target, new_len_line_target, new_len_line_target_2
+        new_len_target = self._len_target - len(self.target)
+        new_len_line_target = len(self.found_lines)
+        new_len_line_target_2 = len(self.found_lines2)
+        new_words_found = self._len_word_target - _word_len(self.target)
+        return self._len_target, new_len_target, self._len_word_target, new_words_found, self._len_line_target, new_len_line_target, new_len_line_target_2
     

@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+import matplotlib
+
 def is_date_only(dt: datetime) -> bool:
     return (
         dt.hour == 0 and
@@ -40,6 +42,8 @@ def timedeltas_to_unit(values, unit="minutes"):
 
 
 def plot_difference_histograms(records, unit="minutes", bins=50, title="Time difference distribution"):
+    font = {'size'   : 16}
+    matplotlib.rc('font', **font)
     all_diffs = [r["difference"] for r in records]
     specific_diffs = [r["difference"] for r in records if r["from_specific_time"]]
 
