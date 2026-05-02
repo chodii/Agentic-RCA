@@ -71,7 +71,7 @@ class Incident:
         self.issue_type = extract_from_sheet(row, ISSUE)
     
     def __str__(self):
-        return str(self.chunk_folder) + "\n" + str(self.ts)
+        return str(self.chunk_folder) + "\t" + str(self.ts)
     
     def get_target(self):
         if not self._target:
@@ -93,3 +93,28 @@ class Incident:
     
     def swap_into_db(self):
         db_loader.api(root=self.chunk_folder)
+        
+
+def log_file_reader(pth):
+    content = None
+    with open(pth, "r", encoding="utf-8") as fp:
+        file = json.load(fp)
+        content = file["content"]
+    #if len(content) >= 1 and ((len(content[0]) == 2 and type(content[0][1])==dict) or (type(content[0][0])==dict)):
+    #    print("\ndict:",pth)
+    for log_entry in content:
+        if len(log_entry) == 2:
+            if type(log_entry[1]) == dict:
+                log_line = str(log_entry[0])
+                for k in log_entry[1]:
+                    log_line += " "+str(log_entry[1][k])
+            elif type(log_entry[1]) == str:
+                log_line = str(log_entry[0]) + " "+ log_entry[1]
+            else:
+                raise Exception(str(type(log_entry[1]))+" type in log_entry[1] for: "+pth)
+        elif len(log_entry) == 1:
+            log_line = log_entry[0]
+        else:
+            raise Exception("Error of log entry length:"+str(log_entry))
+        for line in log_line.split("\n"):
+            yield line

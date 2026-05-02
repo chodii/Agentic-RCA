@@ -48,3 +48,53 @@ def relevant_retrieved(pred:list, targ:list):
             print(p)
             rec += 1
     return rec
+
+
+def _word_len(text):
+    text = text.replace("\n", " ").split(" ")
+    word_len = 0
+    for t in text:
+        if len(t)>0:
+            word_len += 1
+    return word_len
+    
+class target_manager:
+    def __init__(self, target:str):
+        self.target = target# 100% word coverage
+        self.line_target = target.split("\n")# 60% line coverage
+        self.line_target_2 = target.split("\n")
+        self.found_lines2 = []
+        # len:
+        self._len_word_target = _word_len(target)
+        self._len_target = len(target)
+        self._len_line_target = len(self.line_target)
+    
+    def log_in_line(self, line):
+        new_line_target = []
+        for i in range(len(self.line_target)):
+            if not self.line_target[i] == line:
+                new_line_target.append(self.line_target[i])
+        self.line_target = new_line_target
+    
+    def log_in_line2(self, line):
+        """ line: <line>
+        """
+        new_line_target = []
+        for i in range(len(self.line_target_2)):
+            if line in self.line_target_2[i]:
+                self.found_lines2.append(line)
+            else:
+                new_line_target.append(self.line_target_2[i])
+        self.line_target_2 = new_line_target
+    
+    def log_in_word(self, line):
+        for word in line.split(" "):
+            self.target.replace(word, "")
+    
+    
+    def result(self):
+        new_len_target = len(self.target)
+        new_len_line_target = len(self.line_target)
+        new_len_line_target_2 = len(self.line_target_2)
+        return self._len_target, new_len_target, self._len_word_target, _word_len(self.target), self._len_line_target, new_len_line_target, new_len_line_target_2
+    

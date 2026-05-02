@@ -92,7 +92,7 @@ def identify_anomalies(src):
     sorted_events = dict(sorted(events.items()))
     return sorted_events
 
-def line_lens_analysis_api(dest_root,ts_mark, time_start, time_end):
+def line_lens_analysis_api(dest_root, ts_mark, time_start, time_end):
     _, winsel_dest = decide_destination(dest_root,ts_mark, time_start, time_end)
     if (not os.path.exists(winsel_dest)):
         raise Exception("Error: Doestination does not exist!")
