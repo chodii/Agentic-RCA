@@ -220,8 +220,9 @@ def line_analysis_api(times_file, dest_root):
 
 def api(root, dest
         , times_file, CHUNK_SIZE, anomally_detection=False
-        , inc_json = "out/chunked_incidents.json"
+        #, inc_json = 
         , LIMIT_CONTENT=True):
+    inc_json = "out/"+str(CHUNK_SIZE)+"/chunked_incidents.json"
     time_differences = []
     chuns = []
     incidents = {}
@@ -246,18 +247,18 @@ def api(root, dest
         chuns.extend(chunk_sizes)
         entry["anomalies"] = anomalies
         entry["chunked_destination"]  = chunk_dest
-        print("\rINCIDENTS:",len(incidents), end="")
+        print("\rINCIDENT:",len(incidents), " ", end="")
     import Visualizations.hist as Viz_Hist
     Viz_Hist.hist_from_array(chuns, x="Chunk Size", y="Frequency", title="Chunk Sizes", show=True)
     time_diffs.plot_difference_histograms(time_differences, unit="hours", bins=30, title="Reported vs actual time")
     import json
-    
+    #os.makedirs(inc_json, exist_ok=True)
     inc_json = os.path.abspath(inc_json)
     os.makedirs(os.path.dirname(inc_json), exist_ok=True)
     with open(inc_json, "w", encoding="utf-8") as fp:
         json.dump(incidents, fp,
         default=str)
-    print("Finished, results were written into:", inc_json)
+    print("\nFinished, results were written into:", inc_json)
     return inc_json
     
 if __name__ == "__main__":

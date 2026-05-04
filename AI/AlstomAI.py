@@ -114,14 +114,14 @@ def api(user_problem
     system_prompt_pth=str(MODULE_DIR)+"/"+system_prompt_pth
     with open(file=tools, mode="r", encoding="utf-8") as fp:
         tool_schemas = json.load(fp)
-    result_log = "out/last_chats"+datetime.now().strftime("%Y%m%d_%H%M%S")+".json"
+    result_log = "out/last_chats/"+datetime.now().strftime("%Y%m%d_%H%M%S")+".json"
     #gpt_connector.ask_open_router(messages=[{"role":...,"content":...}])
     
     rca, messages = run_rca(user_problem=user_problem
                             , tool_schemas=tool_schemas
                             , system_prompt_pth=system_prompt_pth
                             , context_manager=context_manager)
-    
+    os.makedirs(result_log,exist_ok=True)
     with open(result_log, mode="w", encoding="utf-8") as fp:
         json.dump(messages, fp, default=str)
     return rca

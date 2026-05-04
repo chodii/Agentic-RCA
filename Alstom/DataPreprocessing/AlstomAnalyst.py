@@ -95,7 +95,7 @@ def identify_anomalies(src):
 def line_lens_analysis_api(dest_root, ts_mark, time_start, time_end):
     _, winsel_dest = decide_destination(dest_root,ts_mark, time_start, time_end)
     if (not os.path.exists(winsel_dest)):
-        raise Exception("Error: Doestination does not exist!")
+        raise Exception("\nError: Doestination does not exist!")
     line_lengths = Chunking.chunker.line_lengths(winsel_dest)
     return line_lengths
 
@@ -138,7 +138,7 @@ def main():
     chunk_sizes, _, _ = api(root, dest, time_start, time_end, chunk_size)
     
     Viz_Hist.hist_from_array(chunk_sizes, x="chunk sizes", y="numbers", title="Real Chunk Sizes", show=True)
-    print(len(chunk_sizes), "chunks created")
+    print("\t ",len(chunk_sizes), "chunks created", end="")
     # (Build time-dependency graph (of all)
     # Build AI agent
     #   - reasoning

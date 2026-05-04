@@ -17,15 +17,21 @@ from AI import message_manager
 import json
 import argparse
 
-def coverage_analysis(old, new, tag):
+def coverage_analysis(old, new, tag, dest):
     covs = []
     for i in range(len(old)):
         cov = (new[i])/old[i]
         covs.append(cov)
-    hist.hist_from_array_single(covs, x="Coverage of target output", y="Count", title="Potential "+tag+" coverage of target output")
+    hist.hist_from_array_single(covs, x="Coverage of target output", y="Count", title="Potential "+tag+" coverage of target output", dest=dest)
     return covs
 
-def coverage_analysis_api(incidents_json):
+def coverage_analysis_api(incidents_json, chunking):
+    if chunking is None:
+        tag = "windowed_selection/"
+    else:
+        tag = "chunked_"+str(chunking)+"/"
+    dest = "out/"+tag
+    
     lens_orig = []
     word_lens_orig = []
     line_lens_oring = []
@@ -41,7 +47,7 @@ def coverage_analysis_api(incidents_json):
         src = ""
         for s in srcs:
             src += s+"/"
-        src += "windowed_selection/"
+        src += tag
         target = incident.get_target()
         target_manager = evaluate_IR.target_manager(target)
         contained_fp = []
@@ -63,14 +69,15 @@ def coverage_analysis_api(incidents_json):
         word_lens_new.append(new_word_len)# word contained
         line_lnes_new.append(new_line_len)# line exact
         line_2_lnes_new.append(new_len_line_target_2)# line contained
-    hist.hist_from_array_single(lens_orig, x="Length of target output", y="Count", title="Length of target [characters]")
-    hist.hist_from_array_single(word_lens_orig, x="Length of target output", y="Count", title="Length of target [words]")
-    hist.hist_from_array_single(line_lens_oring, x="Length of target output", y="Count", title="Length of target [lines]")
-    coverage_analysis(lens_orig, lens_new, "character")
-    coverage_analysis(word_lens_orig, word_lens_new, "word")
-    coverage_analysis(line_lens_oring, line_lnes_new, "line exact")
-    l2l_cov = coverage_analysis(line_lens_oring, line_2_lnes_new, "line contained")
-    with open("out/coverage_analysis.json", mode="w", encoding="utf-8") as fp:
+    os.makedirs(dest, exist_ok=True)
+    hist.hist_from_array_single(lens_orig, x="Length of target output", y="Count", title="Length of target [characters]", dest=dest)
+    hist.hist_from_array_single(word_lens_orig, x="Length of target output", y="Count", title="Length of target [words]", dest=dest)
+    hist.hist_from_array_single(line_lens_oring, x="Length of target output", y="Count", title="Length of target [lines]", dest=dest)
+    coverage_analysis(lens_orig, lens_new, "character", dest=dest)
+    coverage_analysis(word_lens_orig, word_lens_new, "word", dest=dest)
+    coverage_analysis(line_lens_oring, line_lnes_new, "line exact", dest=dest)
+    l2l_cov = coverage_analysis(line_lens_oring, line_2_lnes_new, "line contained", dest=dest)
+    with open(dest+"coverage_analysis.json", mode="w", encoding="utf-8") as fp:
         json.dump({"files":incident_relevant_files,"l2l_coverage":l2l_cov}, fp)
     
 def api(context_manager, incidents_json):
@@ -115,6 +122,7 @@ def parse_args():
           action="store_true",
           help="Target analysis instead of experiments"
       )
+    
     args = parser.parse_args()
     if args.trunk:
         context_manager = message_manager.ContextManagement.TRUNCATION
@@ -127,4 +135,4 @@ if __name__ == "__main__":
     if not target_analysis:
         api(context_manager=context_manager, incidents_json=incidents_json)
     else:
-        coverage_analysis_api(incidents_json)
+        coverage_analysis_api(incidents_json, chunking=5000)

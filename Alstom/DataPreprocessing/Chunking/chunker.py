@@ -92,7 +92,7 @@ def chunk_dataset(src, dest, max_chunk_len, LIMIT_CONTENT, CHUNKING=Chunking.LAN
     files_created={}
     chunks_ids={}
     chunk_sizes = []
-    print("Chunking from",src,"into",dest)
+    #print("Chunking from",src,"into",dest, end="\t ")
     os.makedirs(dest, exist_ok=True)
     for fp in walker.dataset_iterator(src):
         if ".json" not in fp:
@@ -141,7 +141,7 @@ def chunk_dataset(src, dest, max_chunk_len, LIMIT_CONTENT, CHUNKING=Chunking.LAN
         chunk = create_chunk(orig_filename, chunks_ids, content)
         write_chunk(dest_fp, files_created, chunk)
         chunk_sizes.append(chunk_len)
-    print(sum([chunks_ids[k] for k in chunks_ids]), "chunks created")
+    #print(sum([chunks_ids[k] for k in chunks_ids]), "chunks created", end="\t ")
     return chunk_sizes
 
 def line_lengths(src):
