@@ -23,6 +23,23 @@ DB_CONFIG = {
     "password": os.environ["MONLIS_DB_PSW"],
 }
 
+from datetime import datetime
+def _select_time_span(content):
+    t0 = None
+    t1 = None
+    if content[0][0] is not None:
+        for i in range(len(content)):
+            dt = datetime.fromisoformat(content[i][0])
+            if t0 is None or t0>dt:
+                t0 = dt
+            if t1 is None or t1<dt:
+                t1 = dt
+    if t0 is not None:
+        t0 = dt.isoformat()
+    if t1 is not None:
+        t1 = dt.isoformat()
+    return t0, t1
+                
 
 def parse_record(obj: dict) -> Optional[dict]:
     """
@@ -42,14 +59,16 @@ def parse_record(obj: dict) -> Optional[dict]:
 
     if source_path is None or chunk_id is None or not content:
         return None
-
+    
+    t0, t1 = _select_time_span(content)
+            
     return {
         "source_path": source_path,
         "chunk_id": int(chunk_id),
         "content_json": json.dumps(content),
         "content_text": flatten_content(content),
-        "time_start": content[0][0],
-        "time_end": content[-1][0] if content[0][0] is not None else None,
+        "time_start": t0,
+        "time_end": t1,
         "has_time": content[0][0] is not None
     }
 

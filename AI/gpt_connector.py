@@ -64,6 +64,7 @@ def ask_open_router(messages, tools=None):
         response.raise_for_status()
 
     model_response = response.json()
+
     model_response = model_response["choices"][0]["message"]
-    print("...")
-    return model_response
+    usage = model_response.get("usage", {})
+    return usage, model_response

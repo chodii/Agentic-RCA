@@ -74,7 +74,7 @@ class DB_Tools:
     
 
 
-def run_rca(user_problem: str, tool_schemas, system_prompt_pth, context_manager):
+def run_rca(user_problem: str, tool_schemas, system_prompt_pth, context_manager, res_dest):
     displatcher = DB_Tools()
     messanger = message_manager.MessageManager(
                 db_manager = displatcher
@@ -82,20 +82,24 @@ def run_rca(user_problem: str, tool_schemas, system_prompt_pth, context_manager)
                  , context_management_strategy = context_manager
                  , gpt = gpt_connector.ask_open_router)
     messanger.init_problem(user_problem=user_problem)
+    usages = []
     try:
         while True:
             if messanger.force_end:
                 break
             if messanger.about_to_end:
                 tool_schemas = None# I want you to talk --> therefore no tools
-            assistant_message = gpt_connector.ask_open_router(messages=messanger.messages
+            conversation = messanger.get_messages()
+            log_message(conversation, res_dest=res_dest)
+            usage, assistant_message = gpt_connector.ask_open_router(messages=conversation
                                                  , tools=tool_schemas)
+            usages.append(usage)
             messanger.add_response(assistant_message)
     except Exception as e:
         print("\nExcepted:",e)
-        return "-", messanger.messages
+        return "", messanger._messages, json.dumps(usages, default=str)
     print()
-    return assistant_message, messanger.messages#.get("content", "")
+    return assistant_message, messanger._messages, json.dumps(usages, default=str)#.get("content", "")
 
 
 
@@ -105,6 +109,7 @@ def main():
     print("The root cause analysis of the issue is:", rca)
 
 from pathlib import Path
+CHATS_OUT = "out/last_chats/"
 def api(user_problem
         , context_manager
         , tools = "AlstAI-tools.json"
@@ -114,17 +119,27 @@ def api(user_problem
     system_prompt_pth=str(MODULE_DIR)+"/"+system_prompt_pth
     with open(file=tools, mode="r", encoding="utf-8") as fp:
         tool_schemas = json.load(fp)
-    result_log = "out/last_chats/"+datetime.now().strftime("%Y%m%d_%H%M%S")+".json"
+    res_dest = CHATS_OUT+datetime.now().strftime("%Y%m%d_%H%M%S")
+    result_log = res_dest+".json"
     #gpt_connector.ask_open_router(messages=[{"role":...,"content":...}])
     
-    rca, messages = run_rca(user_problem=user_problem
+    rca, messages, usages = run_rca(user_problem=user_problem
                             , tool_schemas=tool_schemas
                             , system_prompt_pth=system_prompt_pth
-                            , context_manager=context_manager)
-    os.makedirs(result_log,exist_ok=True)
+                            , context_manager=context_manager
+                            , res_dest=res_dest+"/")
+    os.makedirs(CHATS_OUT,exist_ok=True)
     with open(result_log, mode="w", encoding="utf-8") as fp:
-        json.dump(messages, fp, default=str)
+        json.dump({"messages":messages, "usages":usages}, fp, default=str)
     return rca
+
+def log_message(conversationJSON, res_dest):
+    result_log = res_dest+"turn"+datetime.now().strftime("%Y%m%d_%H%M%S")+".json"
+    result_log = os.path.abspath(result_log)
+    os.makedirs(res_dest, exist_ok=True)
+    with open(result_log, mode="w", encoding="utf-8") as fp:
+        json.dump(conversationJSON, fp, default=str)
+    
 
 if __name__ == "__main__":
     main()

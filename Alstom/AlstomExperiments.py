@@ -5,6 +5,7 @@ Created on Fri Apr 24 16:00:35 2026
 @author: chodo
 """
 
+
 from DataPreprocessing import IssueLoader
 from DataPreprocessing.Evaluation import evaluate_IR
 from DataPreprocessing import AllChunker
@@ -83,6 +84,8 @@ def coverage_analysis_api(incidents_json, chunking):
 def api(context_manager, incidents_json):
     #incident=None
     #incidents_json=r".\DataPreprocessing\out\chunked_incidents.json"
+    all_test_cases = {}
+    
     for incident in IssueLoader.load_incidents(incidents_json=incidents_json):
         print(incident)
         incident.swap_into_db()# (yyyy-mm-ddThh:mm:ss+hh:ss)
@@ -95,8 +98,12 @@ def api(context_manager, incidents_json):
         rca = rca["content"]
         print("\nRCA:",rca)
         target = incident.get_target()
-        precission,recall = evaluate_IR.eval_prec_rec(pred=rca, targ=target)
-        print("P:",precission, "\nR:",recall)
+        metrics = evaluate_IR.eval_prec_rec(pred=rca, targ=target)
+        for k in metrics:
+            print(str(k)+":", metrics[k])
+            if k not in all_test_cases:
+                all_test_cases[k] = []
+            all_test_cases[k].append(metrics[k])
         break
 
 
@@ -108,8 +115,14 @@ def parse_args():
         "-t", "--trunk",
         dest="trunk",
         action="store_true",
-        help="Truncation"
+        help="Truncation context management strategy"
     )
+    parser.add_argument(
+         "-s", "--summarization",
+         dest="summarization",
+         action="store_true",
+         help="Summarization context management strategy"
+     )
     parser.add_argument(
          "-i", "--incidents",
          dest="incidents",
@@ -124,7 +137,9 @@ def parse_args():
       )
     
     args = parser.parse_args()
-    if args.trunk:
+    if args.summarization:
+        context_manager = message_manager.ContextManagement.SUMMARIZATION
+    elif args.trunk:
         context_manager = message_manager.ContextManagement.TRUNCATION
     else:
         context_manager = message_manager.ContextManagement.NONE
@@ -135,4 +150,7 @@ if __name__ == "__main__":
     if not target_analysis:
         api(context_manager=context_manager, incidents_json=incidents_json)
     else:
-        coverage_analysis_api(incidents_json, chunking=5000)
+        chunk_size = incidents_json.replace("\\","/").split("/")[-2]
+        if not chunk_size.isdigit():
+            chunk_size = None
+        coverage_analysis_api(incidents_json, chunking=chunk_size)

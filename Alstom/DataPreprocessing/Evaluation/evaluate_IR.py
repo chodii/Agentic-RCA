@@ -5,18 +5,35 @@ Created on Fri Apr 24 15:26:03 2026
 @author: chodo
 """
 from nltk.translate.bleu_score import corpus_bleu, sentence_bleu, SmoothingFunction
-def bleu_eval(hypothesis, reference):
-    #hypothesis = tokenize_rca_text(pred)
-    #reference = tokenize_rca_text(targ)
 
-    smoothie = SmoothingFunction().method4
+from rouge_score import rouge_scorer
+# REPLACE BLEU with ROGUE
+def rouge_eval(pred, targ):
+    scorer = rouge_scorer.RougeScorer(
+            ['rouge1', 'rouge2', 'rouge3', 'rouge4'],
+            use_stemmer=True
+        )
+    rouge_scores = scorer.score(targ, pred)
+    jsonscores = {}
+    for key, value in rouge_scores.items():
+        jsonscores[key] = {"precision":value.precision, "recall":value.recall, "F1":value.F1}
+    return jsonscores
 
-    return {
-        "bleu_1": sentence_bleu([reference], hypothesis, weights=(1.0, 0, 0, 0), smoothing_function=smoothie),
-        "bleu_2": sentence_bleu([reference], hypothesis, weights=(0.5, 0.5, 0, 0), smoothing_function=smoothie),
-        "bleu_3": sentence_bleu([reference], hypothesis, weights=(1/3, 1/3, 1/3, 0), smoothing_function=smoothie),
-        "bleu_4": sentence_bleu([reference], hypothesis, weights=(0.25, 0.25, 0.25, 0.25), smoothing_function=smoothie),
-    }
+import re
+def _over_normalize(text: str) -> str:
+    text = text.lower()
+    text = re.sub(r"""[:<>,.+;=]+""", "", text)
+    text = re.sub(r"""[/\\()\-*\n\t"']+""", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+def _lemmatize(txt):
+    lemmatizer = WordNetLemmatizer()
+    tokens = word_tokenize(txt)
+    lemmatized_words = [lemmatizer.lemmatize(word) for word in tokens]
+    return lemmatized_words
 
 def _normlize(txt):
     new_arr = []
@@ -30,22 +47,31 @@ def _normlize(txt):
             new_arr.append(p)
     return new_arr
 
-def eval_prec_rec(pred:list, targ:list):
-    pred = _normlize(pred)
-    targ = _normlize(targ)
-    bleu_score = bleu_eval(pred, targ)
-    print(bleu_score)
-    print("evaluating",len(pred),"x",len(targ))
+def eval_prec_rec(pred:str, targ:str):
+    #pred = _normlize(pred)
+    #targ = _normlize(targ)
+    pred = _over_normalize(pred)
+    targ = _over_normalize(targ)
+    rouge_score = rouge_eval(pred, targ)
+    pred = _lemmatize(pred)
+    targ = _lemmatize(targ)
+    #bleu_score = bleu_eval(pred, targ)
+    #print(rouge_score)
+    #print("evaluating",len(pred),"x",len(targ))
     rel_ret = relevant_retrieved(pred, targ)
     recall = rel_ret/len(pred)
-    precission = rel_ret/len(targ)
-    return recall, precission
+    precision = rel_ret/len(targ)
+    metrics={"recall":recall
+            ,"precision":precision
+            ,"ROGUE":rouge_score}
+    log(pred, targ, metrics=metrics)
+    return metrics
 
 def relevant_retrieved(pred:list, targ:list):
     rec = 0
     for p in pred:
         if p in targ:
-            print(p)
+            #print(p)
             rec += 1
     return rec
 
@@ -57,7 +83,18 @@ def _word_len(text):
         if len(t)>0:
             word_len += 1
     return word_len
-    
+import os
+import json
+from datetime import datetime
+DEST = "out/eval/"
+def log(pred, targ, metrics):
+    os.makedirs(DEST, exist_ok=True)
+    result_log = DEST+"e"+datetime.now().strftime("%Y%m%d_%H%M%S")+".json"
+    obj = {"pred":pred, "targ":targ, "metrics":metrics}
+    with open(result_log, "w", encoding="utf-8") as fp:
+        json.dump(obj, fp)
+
+
 class target_manager:
     def __init__(self, target:str):
         self.target = target# 100% word coverage
