@@ -9,6 +9,7 @@ import os, sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import IssueLoader
 import statistics
+import numpy as np
 
 class ExperimentsEvaluator:
     def __init__(self):
@@ -35,17 +36,19 @@ class ExperimentsEvaluator:
         results = {}
         for k in self.metrics:
             results[k] = metric_statistics(self.metrics[k])
-        return results
+        return results, self.metrics
     
     def log_results(self, dest, res_name):
-        results = self.get_results()
+        stats, full_metrics = self.get_results()
         TS = datetime.now().strftime("%Y%m%d_%H%M%S")+"-"
         with open(dest+TS+res_name, "w", encoding="utf-8") as fp:
-            json.dump(results, fp=fp)
+            json.dump({"statistic":stats
+                       ,"samples":full_metrics}, fp=fp)
 
 def metric_statistics(arr:list):
     return {"mean":sum(arr)/len(arr)
-            , "median":statistics.median(arr)}
+            , "median":statistics.median(arr)
+            , "variation":np.var(arr)}
 
 def src_cid(sample):
     src = sample["source_path"]
@@ -74,6 +77,9 @@ def eval_db_recall(METRICS, target_rca, retrieved_chunks, relevant_all, relevant
     METRICS["precission relevant unique"] = safe_len_diff(r2, retrieved_chunks)
     METRICS["recall relevant all"] = safe_len_diff(rn, relevant_all)
     METRICS["precission relevant all"] = safe_len_diff(rn, retrieved_chunks)
+    METRICS["retrieved"] = len(retrieved_chunks)
+    METRICS["relevant unique"] = len(r2)
+    METRICS["relevant all"] = len(rn)
     _res, coverages =TM.result_as_dict()
     for k in coverages:
         METRICS["Reference recall ["+k+"]"] = coverages[k]
@@ -91,7 +97,6 @@ def rouge_eval(pred, targ):
     rouge_scores = scorer.score(targ, pred)
     jsonscores = {}
     for key, value in rouge_scores.items():
-        print(key, value)
         rouge_metr = {"precision":value.precision, "recall":value.recall, "F1":value.fmeasure}
         for k in rouge_metr:
             jsonscores[key+"-"+k] = rouge_metr[k]

@@ -91,7 +91,7 @@ def coverage_analysis_api(incidents_json, chunking):
     with open(dest+"coverage_analysis.json", mode="w", encoding="utf-8") as fp:
         json.dump({"files":incident_relevant_files,"files_all":incident_all_relevant_files, "l2l_coverage":l2l_cov}, fp)
     
-def api(context_manager, incidents_json, chunk_size, VALIDATION=True):
+def api(context_manager, incidents_json, chunk_size, VALIDATION=False):
     #incident=None
     #incidents_json=r".\DataPreprocessing\out\chunked_incidents.json"
     tag = "chunked_"+str(chunk_size)+"/"
@@ -109,7 +109,7 @@ def api(context_manager, incidents_json, chunk_size, VALIDATION=True):
         TIME_ANCHOR = "This incident occured around (yyyy-mm-dd):"+str(incident.ts).split("T")[0]+"\n"
         user_problem = TIME_ANCHOR+incident.description
         #print(">:",str(user_problem)[:150],"...")
-        rca, retrieved = AlstomAI.api(user_problem=user_problem
+        rca, retrieved, rounds = AlstomAI.api(user_problem=user_problem
                            , context_manager=context_manager)
         rca = rca["content"]
         #print("\nRCA:",rca)
@@ -117,7 +117,9 @@ def api(context_manager, incidents_json, chunk_size, VALIDATION=True):
         #metrics["Recall_db"]=retr_common/retr_rel
         #metrics["Precision_db:"]=retr_common/retr_ret
     if VALIDATION:
-        res_name = "-VALIDATION_result.json"
+        res_name = "-VALIDATION_results.json"
+    else:
+        res_name = "-EXPERIMENT_results.json"
     evaluator.log_results(dest, res_name)
 
 
@@ -149,6 +151,12 @@ def parse_args():
           action="store_true",
           help="Target analysis instead of experiments"
       )
+    parser.add_argument(
+          "-v", "--validation",
+          dest="validation",
+          action="store_true",
+          help="Validation set experimentation"
+      )
     
     args = parser.parse_args()
     if args.summarization:
@@ -157,13 +165,13 @@ def parse_args():
         context_manager = message_manager.ContextManagement.TRUNCATION
     else:
         context_manager = message_manager.ContextManagement.NONE
-    return context_manager, args.incidents, args.target_analysis
+    return context_manager, args.incidents, args.target_analysis, args.validation
 
 if __name__ == "__main__":
-    context_manager, incidents_json, target_analysis = parse_args()
+    context_manager, incidents_json, target_analysis, validation = parse_args()
     chunk_size = incidents_json.replace("\\","/").split("/")[-2]
     if not target_analysis:
-        api(context_manager=context_manager, incidents_json=incidents_json, chunk_size=chunk_size)
+        api(context_manager=context_manager, incidents_json=incidents_json, chunk_size=chunk_size, VALIDATION=validation)
     else:
         if not chunk_size.isdigit():
             chunk_size = None

@@ -39,7 +39,9 @@ def _select_time_span(content):
     if t1 is not None:
         t1 = dt.isoformat()
     return t0, t1
-                
+            
+import re
+from typing import Any
 
 def parse_record(obj: dict) -> Optional[dict]:
     """
@@ -56,7 +58,7 @@ def parse_record(obj: dict) -> Optional[dict]:
     source_path = obj.get("source")
     chunk_id = obj.get("chunk_id")
     content = obj.get("content")
-
+    content = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", " ", content)
     if source_path is None or chunk_id is None or not content:
         return None
     
@@ -125,22 +127,24 @@ def import_dataset(root, clear_first=True):
                     rec = parse_record(obj)
                     if rec is None:
                         skipped += 1
-                        print(f"Skipping malformed JSON record in: {fp}")
+                        print(f"\rSkipping malformed JSON record in: {fp}",end="")
                         continue
-
+                    # clean
+                    
+                    
                     insert_one(cur, rec)
                     inserted += 1
 
                     if inserted % 1000 == 0:
                         conn.commit()
-                        print(f"Inserted {inserted} records so far...")
+                        print(f"\rInserted {inserted} records so far...",end="")
 
                 except Exception as e:
                     conn.rollback()
                     skipped += 1
-                    print(f"Skipping {fp}: {e}")
+                    print(f"\rSkipping {fp}: {e}",end="")
             conn.commit()
-    print(f"Done. Inserted={inserted}, skipped={skipped}")
+    print(f"\rDone. Inserted={inserted}, skipped={skipped}",end="")
 
 def flatten_content(content) -> str:
     return "\n".join(line for _, line in content)
