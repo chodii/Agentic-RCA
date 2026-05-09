@@ -71,9 +71,8 @@ FORCE_STOP_KEY = "force_end_prompt"
 
 KEEP_ALL_CONTENT = True
 PERSERVE_REASONING = False
-MAX_ITER = 8
 class MessageManager:
-    
+    _retrieved_from_chunks = []
     def __init__(self, db_manager
                  , system_prompt_pth
                  , context_management_strategy
@@ -95,7 +94,6 @@ class MessageManager:
         self.max_iter = max_iter
         self._messages = messages
         self._msg_ix_crucial = [ix for ix in range(len(messages)+1)]
-        self.consequetive_reasoning = 0
         
     def init_problem(self, user_problem):
         self._messages.append({"role": "user", "content": user_problem})
@@ -114,6 +112,18 @@ class MessageManager:
         self._messages.append(prompt)# keep the conversation whole
         return prompt
     
+    def get_retrieved_from_chunks(self):
+        return self._retrieved_from_chunks
+    
+    def retrieved_from_chunks(self, result):
+        for record in result:
+            file = record.get("source_path", None)
+            cid = record.get("chunk_id", None)
+            if file is None or cid is None:
+                print("\nNONE SOURCE FILE OR CHUNK ID:",record)
+                continue
+            self._retrieved_from_chunks.append(record)
+    
     def add_response(self, assistant_message):
         if self.about_to_end:
             self.force_end = True
@@ -129,7 +139,6 @@ class MessageManager:
         
         self._last_calls = []
         if tool_calls:
-            self.consequetive_reasoning = 0
             self._last_calls.append(len(self._messages))# = the index of the next message
             self._messages.append({
                 "role": "assistant",
@@ -150,7 +159,9 @@ class MessageManager:
                         "tool_call_id": call["id"],
                         #"content": json.dumps(result),
                         "content": json.dumps(result, default=str),
+                        
                     })
+                    self.retrieved_from_chunks(result)
                 elif name == "done":
                     self.about_to_end = True
                     self._last_calls.append(len(self._messages))
@@ -160,7 +171,6 @@ class MessageManager:
                         "content": json.dumps([], default=str),
                     })
         else:
-            self.consequetive_reasoning += 1
             if KEEP_ALL_CONTENT and content is not None:
                 self._msg_ix_crucial.append(len(self._messages))
             self._messages.append({
@@ -168,7 +178,7 @@ class MessageManager:
                 "content": content,
                 "reasoning":reasoning
             })
-        if (not self.force_end) and (self.iteration > MAX_ITER or (self.iteration > 2 and self.consequetive_reasoning > 2)):
+        if (not self.force_end) and (self.iteration > self.max_iter):
             # the model has stopped tool calling
             self.about_to_end = True# dynamic
             print("\n!! The model seems to be arriving to an answer !!\n")

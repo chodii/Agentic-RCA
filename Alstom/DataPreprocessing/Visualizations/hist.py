@@ -12,11 +12,13 @@ import matplotlib
 
 DEST = "./out/"
 
-def hist_from_array(array, x, y, title, bins=30, show=False):
+def hist_from_array(array, x, y, title, bins=30, dest=None, show=False):
     font = {'size'   : 16}
     matplotlib.rc('font', **font)
     
     os.makedirs(DEST, exist_ok=True)
+    if dest is None:
+        dest = DEST
 
     data = np.asarray(array, dtype=float)
     data = data[np.isfinite(data)]  # remove NaN / inf
@@ -39,7 +41,7 @@ def hist_from_array(array, x, y, title, bins=30, show=False):
     plt.tight_layout()
 
     safe_title = re.sub(r'[<>:"/\\|?*]', "_", title)
-    out_path = os.path.join(DEST, safe_title + ".pdf")
+    out_path = os.path.join(dest, safe_title + ".pdf")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
     plt.savefig(out_path, format="pdf")

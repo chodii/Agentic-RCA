@@ -10,24 +10,26 @@ import os
 from pathlib import Path
 from matplotlib import pyplot as plt
 
-def avg_coverage(src_path):
+def avg_coverage(src_path, mode):
     src_path = os.path.abspath(src_path)
     if not os.path.exists(src_path):
         return None
     with open(src_path, "r", encoding="utf-8") as fp:
-        coverage = json.load(fp)["files"]
+        coverage = json.load(fp).get(mode, None)
+        if coverage is None:
+            return None
     chunks = []
     for k in coverage:
         chunks.append(len(coverage[k]))
     return sum(chunks)/len(chunks)
 
-def coverage_anal(root):
+def coverage_anal(root, mode):
     outs = {}
     for folder in root.iterdir():
         if not folder.is_dir():
             continue
         fp = folder / "coverage_analysis.json"
-        avg = avg_coverage(fp)
+        avg = avg_coverage(fp, mode)
         if avg is None:
             continue
         outs[folder.name] = avg
@@ -35,7 +37,7 @@ def coverage_anal(root):
 
 import matplotlib.pyplot as plt
 
-def plot_cov_anal(DEST, outs):
+def plot_cov_anal(DEST, outs, mode):
     coverage = {}
 
     for k, v in outs.items():
@@ -100,21 +102,29 @@ def plot_cov_anal(DEST, outs):
 
     ax.set_xlabel("Chunk size")
     ax.set_ylabel("Average number of relevant sources")
-    ax.set_title("Spread of relevant information across chunks")
+    if mode == "files":
+        title = "Spread of unique relevant information across chunks"
+    if mode == "files_all":
+        title = "Number of chunks that contain potentially relevant information"
+    ax.set_title(title)
     ax.grid(axis="y", linestyle="--", linewidth=0.6, alpha=0.5)
 
     ax.legend()
     fig.tight_layout()
-    fig.savefig(DEST / "postcoverage-analysis.pdf")
+    fig.savefig(DEST / (mode+"-postcoverage-analysis.pdf"))
     plt.show()
     
 def main():
     dest = "out/"
+    mode = "files"
     if len(sys.argv) > 1:
         dest = sys.argv[1]
+        if len(sys.argv) > 2:
+            mode = sys.argv[2]
+    
     root = Path(dest)
-    outs = coverage_anal(root)
-    plot_cov_anal(root,outs)
+    outs = coverage_anal(root, mode)
+    plot_cov_anal(root,outs, mode)
     
 
 if __name__ == "__main__":

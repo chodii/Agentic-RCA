@@ -97,9 +97,9 @@ def run_rca(user_problem: str, tool_schemas, system_prompt_pth, context_manager,
             messanger.add_response(assistant_message)
     except Exception as e:
         print("\nExcepted:",e)
-        return "", messanger._messages, json.dumps(usages, default=str)
+        return "", messanger._messages, json.dumps(usages, default=str), messanger.get_retrieved_from_chunks()
     print()
-    return assistant_message, messanger._messages, json.dumps(usages, default=str)#.get("content", "")
+    return assistant_message, messanger._messages, json.dumps(usages, default=str), messanger.get_retrieved_from_chunks()
 
 
 
@@ -123,7 +123,7 @@ def api(user_problem
     result_log = res_dest+".json"
     #gpt_connector.ask_open_router(messages=[{"role":...,"content":...}])
     
-    rca, messages, usages = run_rca(user_problem=user_problem
+    rca, messages, usages, retrieved = run_rca(user_problem=user_problem
                             , tool_schemas=tool_schemas
                             , system_prompt_pth=system_prompt_pth
                             , context_manager=context_manager
@@ -131,7 +131,7 @@ def api(user_problem
     os.makedirs(CHATS_OUT,exist_ok=True)
     with open(result_log, mode="w", encoding="utf-8") as fp:
         json.dump({"messages":messages, "usages":usages}, fp, default=str)
-    return rca
+    return rca, retrieved
 
 def log_message(conversationJSON, res_dest):
     result_log = res_dest+"turn"+datetime.now().strftime("%Y%m%d_%H%M%S")+".json"

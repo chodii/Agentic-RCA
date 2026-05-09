@@ -222,7 +222,8 @@ def api(root, dest
         , times_file, CHUNK_SIZE, anomally_detection=False
         #, inc_json = 
         , LIMIT_CONTENT=True):
-    inc_json = "out/"+str(CHUNK_SIZE)+"/chunked_incidents.json"
+    inc_dst = "out/"+str(CHUNK_SIZE)+"/"
+    inc_json = inc_dst+"chunked_incidents.json"
     time_differences = []
     chuns = []
     incidents = {}
@@ -249,7 +250,7 @@ def api(root, dest
         entry["chunked_destination"]  = chunk_dest
         print("\rINCIDENT:",len(incidents), " ", end="")
     import Visualizations.hist as Viz_Hist
-    Viz_Hist.hist_from_array(chuns, x="Chunk Size", y="Frequency", title="Chunk Sizes", show=True)
+    Viz_Hist.hist_from_array(chuns, x="Chunk Size", y="Frequency", title="Chunk Sizes", dest=inc_dst, show=True)
     time_diffs.plot_difference_histograms(time_differences, unit="hours", bins=30, title="Reported vs actual time")
     import json
     #os.makedirs(inc_json, exist_ok=True)
