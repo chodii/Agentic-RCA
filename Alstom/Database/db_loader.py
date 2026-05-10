@@ -43,6 +43,9 @@ def _select_time_span(content):
 import re
 from typing import Any
 
+def clear_str(content:str):
+    return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", " ", content)
+
 def parse_record(obj: dict) -> Optional[dict]:
     """
     Expected JSON format:
@@ -58,7 +61,10 @@ def parse_record(obj: dict) -> Optional[dict]:
     source_path = obj.get("source")
     chunk_id = obj.get("chunk_id")
     content = obj.get("content")
-    content = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", " ", content)
+    cont_new = []
+    for cont in content:
+        cont_new.append([cont[0], clear_str(cont[1])])
+    content = cont_new
     if source_path is None or chunk_id is None or not content:
         return None
     

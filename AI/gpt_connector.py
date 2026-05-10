@@ -22,8 +22,8 @@ def ask_open_ai():
 import requests
 import json
 import time
-def ask_open_router(messages, tools=None):
-    time.sleep(10)
+def ask_open_router(messages, tools=None, timer=0.5):
+    time.sleep(timer)
     API_KEY = os.environ["OPENROUTER"]
     #model = "openai/gpt-5.2"
     model="openai/gpt-4o-mini"

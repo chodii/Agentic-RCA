@@ -98,7 +98,7 @@ def run_rca(user_problem: str, tool_schemas, system_prompt_pth, context_manager,
     except Exception as e:
         print("\nExcepted:",e)
         return "", messanger._messages, json.dumps([messanger.iteration, usages], default=str), messanger.get_retrieved_from_chunks()
-    return assistant_message, messanger._messages, json.dumps([messanger.iteration, usages], default=str), messanger.get_retrieved_from_chunks()
+    return assistant_message, messanger._messages, [messanger.iteration, json.dumps(usages, default=str)], messanger.get_retrieved_from_chunks()
 
 
 
@@ -121,7 +121,6 @@ def api(user_problem
     res_dest = CHATS_OUT+datetime.now().strftime("%Y%m%d_%H%M%S")
     result_log = res_dest+".json"
     #gpt_connector.ask_open_router(messages=[{"role":...,"content":...}])
-    
     rca, messages, usages, retrieved = run_rca(user_problem=user_problem
                             , tool_schemas=tool_schemas
                             , system_prompt_pth=system_prompt_pth

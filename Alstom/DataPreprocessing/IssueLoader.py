@@ -41,16 +41,18 @@ def load_incidents(incidents_json, chunk_size, OUT):#="out/chunked_"
     with open(incidents_json, "r", encoding="utf-8") as fp:
         incidents = json.load(fp)
     relevant_chunks = {}
-    with open(OUT+"/coverage_analysis.json", "r", encoding="utf-8") as fp:
-        cover_anal = json.load(fp)
-        for i, ts in enumerate(cover_anal["files"]):
-            relevant_chunks[ts] = {"files":cover_anal["files"][ts]
-                                   , "score":cover_anal["l2l_coverage"][i]
-                                   , "files_all":cover_anal["files_all"][ts]}
+    cov_file = OUT+"/coverage_analysis.json"
+    if os.path.exists(cov_file):
+        with open(cov_file, "r", encoding="utf-8") as fp:
+            cover_anal = json.load(fp)
+            for i, ts in enumerate(cover_anal["files"]):
+                relevant_chunks[ts] = {"files":cover_anal["files"][ts]
+                                       , "score":cover_anal["l2l_coverage"][i]
+                                       , "files_all":cover_anal["files_all"][ts]}
         
     for k in incidents:
         incident = Incident(incident=incidents[k])
-        incident.set_relevant_chunks(relevant_chunks[incident.ts])
+        incident.set_relevant_chunks(relevant_chunks.get(incident.ts, None))
         yield incident
 
 def extract_from_sheet(row, information):
@@ -116,6 +118,8 @@ class Incident:
         db_loader.api(root=self.chunk_folder)
 
     def set_relevant_chunks(self, rel_chunks):
+        if rel_chunks is None:
+            return
         target_files_unique = rel_chunks["files"]
         self._target_chunks_unique = []
         self._target_retrieval_rec_unique = rel_chunks["score"]

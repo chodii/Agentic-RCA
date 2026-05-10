@@ -14,17 +14,22 @@ import numpy as np
 class ExperimentsEvaluator:
     def __init__(self):
         self.metrics = {}
+        self.comparisons = []
+        
     
-    def evaluate(self, incident, rca, retrieved):
+    def evaluate(self, incident, rca, retrieved, rounds):
         target_chunks_unique, target_chunks_all = incident.get_relevant_chunks()
         target = incident.get_target()
-        metrics = eval_prec_rec(pred=rca, targ=target)
+        metrics, _txts = eval_prec_rec(pred=rca, targ=target)
         eval_db_recall(METRICS = metrics
                         , target_rca = target
                         , retrieved_chunks=retrieved
                         , relevant_all = target_chunks_all
                         , relevant_unique = target_chunks_unique)
+        metrics["usage-rounds"] = rounds
         self.add_metrics(metrics)
+        self.comparisons.append(_txts)
+        
     
     def add_metrics(self, metrics):
         for k in metrics:
@@ -43,7 +48,9 @@ class ExperimentsEvaluator:
         TS = datetime.now().strftime("%Y%m%d_%H%M%S")+"-"
         with open(dest+TS+res_name, "w", encoding="utf-8") as fp:
             json.dump({"statistic":stats
-                       ,"samples":full_metrics}, fp=fp)
+                       ,"samples":full_metrics
+                       , "compared":self.comparisons}, fp=fp)
+        
 
 def metric_statistics(arr:list):
     return {"mean":sum(arr)/len(arr)
@@ -105,18 +112,25 @@ def rouge_eval(pred, targ):
 import re
 def _over_normalize(text: str) -> str:
     text = text.lower()
-    text = re.sub(r"""[<>,.+;=\[\]()\-`]+""", "", text)
-    text = re.sub(r"""[:/\\*\n\t"']+""", " ", text)
+    text = text.replace("<time>", " ")
+    text = re.sub(r"`", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text.strip()
 
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
+
 def _lemmatize(txt):
     lemmatizer = WordNetLemmatizer()
     tokens = word_tokenize(txt)
     lemmatized_words = [lemmatizer.lemmatize(word) for word in tokens]
-    return lemmatized_words
+    new_words = []
+    for word in lemmatized_words:
+        norm_word = re.sub(r"[^A-Za-z0-9]+", "", word)
+        if word in new_words or len(norm_word) == 0:
+            continue
+        new_words.append(word)
+    return new_words
 
 def _normlize(txt):
     new_arr = []
@@ -141,23 +155,33 @@ def eval_prec_rec(pred:str, targ:str):
     #bleu_score = bleu_eval(pred, targ)
     #print(rouge_score)
     #print("evaluating",len(pred),"x",len(targ))
-    rel_ret = relevant_retrieved(pred, targ)
-    recall = rel_ret/len(pred)
-    precision = rel_ret/len(targ)
-    metrics={"recall":recall
-            ,"precision":precision}
+    rel_words_ret, rel_chars_ret = relevant_retrieved(pred=pred, targ=targ)
+    recall_words = rel_words_ret/len(targ)
+    precision_words = rel_words_ret/len(pred)
+    
+    recall_characters = rel_chars_ret/len(''.join(targ))
+    precision_characters = rel_chars_ret/len(''.join(pred))
+    metrics={"recall [number of words]":recall_words
+            ,"precision [number of words]":precision_words
+            , "recall [length of words]": recall_characters
+            ,"precision [length of words]":precision_characters}
     for k in rouge_score:
         metrics[k] = rouge_score[k]
     log(over_pred, over_targ, metrics=metrics)
-    return metrics
+    return metrics, {"reference":targ, "generated":pred}
 
 def relevant_retrieved(pred:list, targ:list):
-    rec = 0
+    rel_words = 0
+    rel_chars = 0
     for p in pred:
-        if p in targ:
-            #print(p)
-            rec += 1
-    return rec
+        for t in targ:
+            if p == t:
+                rel_words += 1
+                rel_chars += len(p)
+                break
+        #if p in targ:
+        #    rec += 1
+    return rel_words, rel_chars
 
 
 def _word_len(text):
@@ -220,6 +244,8 @@ class target_manager:
         """
         contribution = False
         new_line_target = []
+        line = rem_TS_from_line(line)
+        print(line)
         for i in range(len(self.line_target_2)):
             if line in self.line_target_2[i]:
                 self.found_lines2.append(line)
@@ -230,14 +256,14 @@ class target_manager:
         return contribution
     
     def log_in_line_nonrem(self, line):
-        contribution = False
         line = line.strip()
         if len(_over_normalize(line)) < 5:
-            return contribution
+            return False
+        line = rem_TS_from_line(line)
         for i in range(len(self.line_target_all)):
             if line in self.line_target_all[i]:
-                contribution = True
-        return contribution
+                return True
+        return False
     
     def log_in_word(self, line):
         for word in line.split(" "):
@@ -269,3 +295,13 @@ class target_manager:
             ,"sublines":    safe_div(TM_new_len_line_target_2,  TM_len_line_target)
             }
         return results, coverage
+
+
+ISO_TIMESTAMP_RE = re.compile(
+    r"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?\b"
+)
+def rem_TS_from_line(line):
+    cleaned = ISO_TIMESTAMP_RE.sub(" ", line)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    cleaned = cleaned.replace("<time>", "")
+    return cleaned

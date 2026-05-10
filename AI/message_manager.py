@@ -77,7 +77,7 @@ class MessageManager:
                  , system_prompt_pth
                  , context_management_strategy
                  , gpt
-                 , max_iter = 10):
+                 , max_iter = 20):
         self.db_manager = db_manager
         self.gpt = gpt# might be used, depending on the context_management_strategy
         
