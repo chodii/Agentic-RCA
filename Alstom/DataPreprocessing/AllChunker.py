@@ -17,7 +17,7 @@ from DataPreprocessing import Matchmaker
 from DataPreprocessing.Visualizations import time_diffs
 
 from DataPreprocessing.Visualizations import line_lengths_hists
-
+from DataPreprocessing.Evaluation import evaluate_IR
 MIN_SCORE = 8
 def get_incident_root(root, match, ts, DEPTH=3):
     root_parts = match.get("source_path").replace(root, "").split("\\")
@@ -227,6 +227,7 @@ def api(root, dest
     time_differences = []
     chuns = []
     incidents = {}
+    after_dedustats = []
     for reported_time, _incident_ts, incident_root, entry in read_times_file(times_file
                                                         , root
                                                         , time_differences
@@ -234,7 +235,7 @@ def api(root, dest
         time_start = reported_time - SPAN_START
         time_end = reported_time + SPAN_AFTER_END
 
-        chunk_sizes, anomalies, chunk_dest = AlstomAnalyst.api(
+        chunk_sizes, anomalies, chunk_dest, after_dedu = AlstomAnalyst.api(
             incident_root,
             dest,
             time_start,
@@ -245,12 +246,15 @@ def api(root, dest
             , anom_detect=anomally_detection
             , LIMIT_CONTENT=LIMIT_CONTENT
         )
+        reduction = 1-after_dedu# 1 - remained
         chuns.extend(chunk_sizes)
         entry["anomalies"] = anomalies
         entry["chunked_destination"]  = chunk_dest
+        entry["remained_dedu"] = reduction
+        after_dedustats.append(reduction)
         print("\rINCIDENT:",len(incidents), " ", end="")
     import Visualizations.hist as Viz_Hist
-    Viz_Hist.hist_from_array(chuns, x="Chunk Size", y="Frequency", title="Chunk Sizes", dest=inc_dst, show=True)
+    Viz_Hist.hist_from_array(chuns, x="Chunk Size", y="Frequency", title="Chunk Sizes", dest=inc_dst, show=False)
     time_diffs.plot_difference_histograms(time_differences, unit="hours", bins=30, title="Reported vs actual time")
     import json
     #os.makedirs(inc_json, exist_ok=True)
@@ -260,6 +264,8 @@ def api(root, dest
         json.dump(incidents, fp,
         default=str)
     print("\nFinished, results were written into:", inc_json)
+    Viz_Hist.hist_from_array_single(after_dedustats, x="Reduction", y="Frequency", title="Reduction by Deduplication", dest=inc_dst, show=True)
+    print("Reduction: ", evaluate_IR.metric_statistics(after_dedustats))
     return inc_json
     
 if __name__ == "__main__":

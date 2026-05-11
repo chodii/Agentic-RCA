@@ -127,11 +127,11 @@ def api(root, dest
     else:
         anomalies = []        
     chunk_dest = os.path.join(dest,FOLDER_CHUNKED+str(chunk_size))
-    chunk_sizes = Chunking.chunker.chunk_dataset(src=winsel_dest
+    chunk_sizes, after_dedu = Chunking.chunker.chunk_dataset(src=winsel_dest
                                                  , dest=chunk_dest
                                                  , max_chunk_len=chunk_size
                                                  , LIMIT_CONTENT=LIMIT_CONTENT)
-    return chunk_sizes, anomalies, chunk_dest
+    return chunk_sizes, anomalies, chunk_dest, after_dedu
 
 def main():
     root, dest, time_start, time_end, chunk_size = parse_args()

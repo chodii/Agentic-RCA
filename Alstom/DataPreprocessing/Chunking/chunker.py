@@ -14,6 +14,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import _dataset_walker as walker
 
 import json
+from Chunking import deduplicator
 def line_len(line):
     if type(line) == list:
         lineparts_len = 0
@@ -45,21 +46,38 @@ def write_chunk(dest_fp, files_created, chunk):
     with open(filename+".json", mode="w", encoding="utf-8") as jfp:
         json.dump(chunk, jfp)
 
-def my_chunk(line, new_content, max_without_ts):
-    cont_len = len(line[1])
+def get_overhead(line):
+    overhead = 0
+    overheadJSON = None
+    if len(line) == 2:
+        overhead = len(str(line[0]))
+        overheadJSON = [line[0]]
+    else:
+        overhead = len(str(line[0]) + str(line[1]) + str(line[2]))
+        overheadJSON = [line[0:3]]
+    return overhead, overheadJSON
+
+def my_chunk(line, new_content, max_chunk_len):
+    overhead, overheadJSON = get_overhead(line)
+    max_without_ts = max_chunk_len - overhead
+    cont_len = len(line[-1])
     sub_chunks = int(cont_len/max_without_ts) + (1 if cont_len%max_without_ts != 0 else 0)
     for i in range(sub_chunks-1):
-        line_chunk = line[1][max_without_ts*i : max_without_ts*(i+1)]
-        new_content.append([line[0], line_chunk])
-    line_chunk = line[1][max_without_ts*(sub_chunks-1):]
-    new_content.append([line[0], line_chunk])
-    
-    
+        line_chunk = line[-1][max_without_ts*i : max_without_ts*(i+1)]
+        new_content.append(overheadJSON+[line_chunk])
+    line_chunk = line[-1][max_without_ts*(sub_chunks-1):]
+    new_content.append(overheadJSON+[line_chunk])
+
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-def lang_chunk_RCTS(text_splitter, line, new_content):
-    splits = text_splitter.split_text(line[1])
+def lang_chunk_RCTS(line, new_content, max_chunk_len):
+    overhead, overheadJSON = get_overhead(line)
+    max_without_ts = max_chunk_len - overhead
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=max_without_ts
+                                                   , chunk_overlap=10
+                                                   , separators=["\n\n", "\n", "\t", " ", ""])
+    splits = text_splitter.split_text(line[-1])
     for s in splits:
-        new_content.append([line[0], s])
+        new_content.append(overheadJSON+[s])
 
 from enum import Enum
 class Chunking(Enum):
@@ -68,22 +86,15 @@ class Chunking(Enum):
 
 def limit_content(content, max_chunk_len, CHUNKER):
     new_content = []
-    text_splitter = None
-    ts_len = len(str(content[-1][0]))# if any of them has a TS, the last one will
-    max_without_ts = max_chunk_len-ts_len
-    if CHUNKER == Chunking.LANGCHAIN_RCTS:
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=max_without_ts
-                                                       , chunk_overlap=10
-                                                       , separators=["\n\n", "\n", "\t", " ", ""])
     for line in content:
         if len(str(line)) <= max_chunk_len:
             new_content.append(line)
             continue
         if CHUNKER == Chunking.SIMPLE:
-            my_chunk(line=line, new_content=new_content, max_without_ts=max_without_ts)
+            my_chunk(line=line, new_content=new_content, max_chunk_len=max_chunk_len)
             continue
         if CHUNKER == Chunking.LANGCHAIN_RCTS:
-            lang_chunk_RCTS(text_splitter=text_splitter, line=line, new_content=new_content)
+            lang_chunk_RCTS(line=line, new_content=new_content, max_chunk_len=max_chunk_len)
             continue
         raise Exception("Error: no chunking strategy selected.")
     return new_content
@@ -94,6 +105,8 @@ def chunk_dataset(src, dest, max_chunk_len, LIMIT_CONTENT, CHUNKING=Chunking.LAN
     chunk_sizes = []
     #print("Chunking from",src,"into",dest, end="\t ")
     os.makedirs(dest, exist_ok=True)
+    llines_orig = []
+    llines_dedu = []
     for fp in walker.dataset_iterator(src):
         if ".json" not in fp:
             continue
@@ -108,6 +121,9 @@ def chunk_dataset(src, dest, max_chunk_len, LIMIT_CONTENT, CHUNKING=Chunking.LAN
         file_name = fp.replace(src_dir,"").replace(".", "").replace("json", "")
         #dest_dir = src_dir.replace(src, dest)
         dest_fp = dest + file_name
+        FILE_AS_JSON[KEY_CONTENT], (orig_lines, dedup_lines) = deduplicator.dedupt_row(FILE_AS_JSON[KEY_CONTENT])
+        llines_orig.append(orig_lines)
+        llines_dedu.append(dedup_lines)
         if LIMIT_CONTENT:
             JSON_CONTENT = limit_content(FILE_AS_JSON[KEY_CONTENT], max_chunk_len, CHUNKING)
         else:
@@ -142,7 +158,8 @@ def chunk_dataset(src, dest, max_chunk_len, LIMIT_CONTENT, CHUNKING=Chunking.LAN
         write_chunk(dest_fp, files_created, chunk)
         chunk_sizes.append(chunk_len)
     #print(sum([chunks_ids[k] for k in chunks_ids]), "chunks created", end="\t ")
-    return chunk_sizes
+    lines_port_after_dedu = 0 if sum(llines_orig) == 0 else sum(llines_dedu)/sum(llines_orig)
+    return chunk_sizes, lines_port_after_dedu
 
 def line_lengths(src):
     line_lengths = []
