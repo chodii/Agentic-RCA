@@ -245,7 +245,6 @@ class target_manager:
         contribution = False
         new_line_target = []
         line = rem_TS_from_line(line)
-        print(line)
         for i in range(len(self.line_target_2)):
             if line in self.line_target_2[i]:
                 self.found_lines2.append(line)

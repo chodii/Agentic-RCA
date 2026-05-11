@@ -46,7 +46,7 @@ def coverage_analysis_api(incidents_json, chunking):
     incident_relevant_files = {}
     incident_all_relevant_files = {}
     for i,incident in enumerate(IssueLoader.load_incidents(incidents_json=incidents_json, chunk_size=chunking, OUT=dest)):
-        print("\r",i,end="")
+        print("\r",i, incident,end="")
         srcs = incident.chunk_folder.replace("\\","/").split("/")[:-1]
         src = ""
         for s in srcs:

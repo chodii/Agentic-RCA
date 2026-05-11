@@ -49,7 +49,6 @@ def load_incidents(incidents_json, chunk_size, OUT):#="out/chunked_"
                 relevant_chunks[ts] = {"files":cover_anal["files"][ts]
                                        , "score":cover_anal["l2l_coverage"][i]
                                        , "files_all":cover_anal["files_all"][ts]}
-        
     for k in incidents:
         incident = Incident(incident=incidents[k])
         incident.set_relevant_chunks(relevant_chunks.get(incident.ts, None))
@@ -76,7 +75,22 @@ def load_target_chunk_info(target_files, _target_chunks):
             content = json.load(fp)
             src = {"source_path":content["source"], "chunk_id":content.get("chunk_id", None)}
             _target_chunks.append(src)
-    
+
+def rec_to_txt(l):
+    ts = l[0]
+    content = l[-1]
+    if ts:
+        if len(l) == 2:
+            if type(ts) == list:
+                print(str(l))
+                return None
+            line = str(ts if type(ts) == str else ts.isoformat())+" "+str(content)
+        else:
+            line = str(l[2])+" times between "+(l[0] if type(l[0]) == str else l[0].isoformat())+" and "+(l[1] if type(l[1]) == str else l[1].isoformat())+" "+l[-1]
+    else:
+        line = str(content)
+    return line
+
 
 class Incident:
     def __init__(self, incident):
@@ -101,12 +115,7 @@ class Incident:
             converted_target = ExtractorLog.all_from_text(self.raw_target)
             preprocessed = []
             for l in converted_target:
-                ts = l[0]
-                content = l[1]
-                if ts:
-                    line = str(ts.isoformat())+" "+str(content)
-                else:
-                    line = str(content)
+                line = rec_to_txt(l=l)
                 preprocessed.append(line)
             self._target = ""
             for i in range(len(preprocessed)-1):
@@ -145,15 +154,19 @@ def log_file_reader(pth):
 
 def line_in_content(content, pth=None):
     for log_entry in content:
-        if len(log_entry) == 2:
-            if type(log_entry[1]) == dict:
-                log_line = str(log_entry[0])
-                for k in log_entry[1]:
-                    log_line += " "+str(log_entry[1][k])
-            elif type(log_entry[1]) == str:
-                log_line = str(log_entry[0]) + " "+ log_entry[1]
+        if len(log_entry) >= 2:
+            cont = ""
+            if type(log_entry[-1]) == dict:
+                for k in log_entry[-1]:
+                    cont += str(log_entry[-1][k])+" "
+            elif type(log_entry[-1]) == str:
+                cont = log_entry[-1]
             else:
                 raise Exception(str(type(log_entry[1]))+" type in log_entry[1] for: "+pth)
+            log_entry[-1] = cont
+            log_line = rec_to_txt(log_entry)
+            if log_line is None:
+                print(pth)
         elif len(log_entry) == 1:
             log_line = log_entry[0]
         else:

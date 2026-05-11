@@ -29,15 +29,16 @@ def _select_time_span(content):
     t1 = None
     if content[0][0] is not None:
         for i in range(len(content)):
-            dt = datetime.fromisoformat(content[i][0])
-            if t0 is None or t0>dt:
-                t0 = dt
-            if t1 is None or t1<dt:
-                t1 = dt
+            dt_start = datetime.fromisoformat(content[i][0] if len(content[i])==2 else content[i][1])
+            dt_end = datetime.fromisoformat(content[i][0] if len(content[i])==2 else content[i][1])
+            if t0 is None or t0>dt_start:
+                t0 = dt_start
+            if t1 is None or t1<dt_end:
+                t1 = dt_end
     if t0 is not None:
-        t0 = dt.isoformat()
+        t0 = t0.isoformat()
     if t1 is not None:
-        t1 = dt.isoformat()
+        t1 = t1.isoformat()
     return t0, t1
             
 import re
@@ -136,8 +137,6 @@ def import_dataset(root, clear_first=True):
                         print(f"\rSkipping malformed JSON record in: {fp}",end="")
                         continue
                     # clean
-                    
-                    
                     insert_one(cur, rec)
                     inserted += 1
 
@@ -153,7 +152,7 @@ def import_dataset(root, clear_first=True):
     print(f"\rDone. Inserted={inserted}, skipped={skipped}",end="")
 
 def flatten_content(content) -> str:
-    return "\n".join(line for _, line in content)
+    return "\n".join(line[-1] for line in content)
 
 def api(root):
     import_dataset(root, clear_first=True)

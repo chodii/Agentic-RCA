@@ -54,7 +54,7 @@ def get_overhead(line):
         overheadJSON = [line[0]]
     else:
         overhead = len(str(line[0]) + str(line[1]) + str(line[2]))
-        overheadJSON = [line[0:3]]
+        overheadJSON = line[0:3]
     return overhead, overheadJSON
 
 def my_chunk(line, new_content, max_chunk_len):
