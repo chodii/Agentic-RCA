@@ -111,7 +111,7 @@ def plot_cov_anal(DEST, outs, mode):
 
     ax.legend()
     fig.tight_layout()
-    fig.savefig(DEST / (mode+"-postcoverage-analysis.pdf"))
+    fig.savefig(DEST / ("postcoverage-analysis-"+mode+".pdf"))
     plt.show()
     
 def main():

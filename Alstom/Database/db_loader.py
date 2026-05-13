@@ -27,9 +27,9 @@ from datetime import datetime
 def _select_time_span(content):
     t0 = None
     t1 = None
-    if content[0][0] is not None:
+    if content[-1][0] is not None:# if any has, the last will have
         for i in range(len(content)):
-            dt_start = datetime.fromisoformat(content[i][0] if len(content[i])==2 else content[i][1])
+            dt_start = datetime.fromisoformat(content[i][0])
             dt_end = datetime.fromisoformat(content[i][0] if len(content[i])==2 else content[i][1])
             if t0 is None or t0>dt_start:
                 t0 = dt_start
@@ -64,7 +64,7 @@ def parse_record(obj: dict) -> Optional[dict]:
     content = obj.get("content")
     cont_new = []
     for cont in content:
-        cont_new.append([cont[0], clear_str(cont[1])])
+        cont_new.append([cont[0], clear_str(cont[-1])])
     content = cont_new
     if source_path is None or chunk_id is None or not content:
         return None
@@ -78,7 +78,7 @@ def parse_record(obj: dict) -> Optional[dict]:
         "content_text": flatten_content(content),
         "time_start": t0,
         "time_end": t1,
-        "has_time": content[0][0] is not None
+        "has_time": content[-1][0] is not None
     }
 
 

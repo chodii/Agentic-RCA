@@ -88,7 +88,7 @@ class DatasetWindow():
 , "stderr":"""
 from datetime import datetime, timezone, timedelta
 
-def extract_time_relevant_events(root, time_start, time_end, INCLUDE_STATIC_FILES=False):
+def extract_time_relevant_events(root, time_start, time_end, INCLUDE_STATIC_FILES=False, spec_files_only=None, ignore=None):
     ExtractorLog.reset_counter()
     if time_start is None and time_end is None:
         LOG_EXTRACTOR = ExtractorLog.all_from_log
@@ -97,22 +97,29 @@ def extract_time_relevant_events(root, time_start, time_end, INCLUDE_STATIC_FILE
         LOG_EXTRACTOR = ExtractorLog.window_from_log
         BIN_EXTRACTOR = ExtractorBinary.window_from_binary
         ExtractorLog.INCLUDE_STATIC_FILES = INCLUDE_STATIC_FILES
-    file_filters={
-        "log":LOG_EXTRACTOR#(self, file_path, time_start, time_end)
-        , "bin":BIN_EXTRACTOR#(file_path, time_start, time_end)
-        , "txt":LOG_EXTRACTOR
-        , NONE_TYPE:LOG_EXTRACTOR
-        , "status":LOG_EXTRACTOR# log-rotate files, probably useless
-        , UNKNOWN_TYPE:LOG_EXTRACTOR
         
-        ,"xml":LOG_EXTRACTOR
-        ,"js":LOG_EXTRACTOR
-        }
-    ignore = ["pdf", "xlsx", "docx"
-                  , "stderr"# they are empty anyway
-                  , "swp"# swp is a recovered file, there is one in the dataset, ignored for simplicity
-                  , "lastlog"#binary so use :ExtractorBinary.window_from_binary# recent login events
-              ]
+    file_filters={
+            "log":LOG_EXTRACTOR#(self, file_path, time_start, time_end)
+            , "bin":BIN_EXTRACTOR#(file_path, time_start, time_end)
+            , "txt":LOG_EXTRACTOR
+            , NONE_TYPE:LOG_EXTRACTOR
+            , "status":LOG_EXTRACTOR# log-rotate files, probably useless
+            , UNKNOWN_TYPE:LOG_EXTRACTOR
+            
+            ,"xml":LOG_EXTRACTOR
+            ,"js":LOG_EXTRACTOR
+            }
+    if spec_files_only is not None and type(spec_files_only) == list:
+        files_only = {}
+        for k in spec_files_only:
+            files_only[k] = file_filters[k]
+        file_filters = files_only
+    if ignore is None:
+        ignore = ["pdf", "xlsx", "docx"
+                      , "stderr"# they are empty anyway
+                      , "swp"# swp is a recovered file, there is one in the dataset, ignored for simplicity
+                      , "lastlog"#binary so use :ExtractorBinary.window_from_binary# recent login events
+                  ]
 
     non_signif = ["bkp", "old"]
     for i in range(9):

@@ -21,8 +21,10 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import ScalarFormatter
 from datetime import datetime
 
-def plot_data(data_orig):
+def plot_data(data_orig, tag = None, show=False):
     items = []
+    if tag is None:
+        tag = ""
 
     for year, months in data_orig.items():
         for month, count in months.items():
@@ -43,7 +45,9 @@ def plot_data(data_orig):
     # top: linear
     ax1.bar(dates, values, width=25)
     ax1.set_ylabel("Event count")
-    ax1.set_title("Monthly event distribution")
+    ax1.set_title("Monthly event distribution"+tag)
+    if tag is not None:
+        tag = tag.strip().replace(".", "")
     
     # bottom: log
     ax2.bar(dates, values, width=25)
@@ -56,7 +60,8 @@ def plot_data(data_orig):
     ax2.set_xticklabels(tick_labels, rotation=45)
 
     plt.tight_layout()
-    plt.savefig("hist_both.pdf")
-    plt.show()
+    plt.savefig(tag+"hist_both.pdf")
+    if show:
+        plt.show()
 
 #plot_data(data_orig)

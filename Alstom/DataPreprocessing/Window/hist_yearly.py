@@ -22,10 +22,11 @@ data_orig = {
     '2019': {'03': 266516}
 }
 
-def plot_data(data_orig, log=True):
+def plot_data(data_orig, log=True, tag=None, show=False):
     # ---- aggregate yearly counts ----
     year_counts = {}
-    
+    if tag is None:
+        tag = ""
     for year, months in data_orig.items():
         year_counts[int(year)] = sum(months.values())
     
@@ -40,16 +41,17 @@ def plot_data(data_orig, log=True):
     
     plt.xlabel("Year")
     plt.ylabel("Event count")
-    plt.title("Yearly event distribution")
-    
+    plt.title("Yearly event distribution"+tag)
+    if tag is not None:
+        tag = tag.strip().replace(".", "")
     plt.xticks(years, rotation=45)
     
     plt.tight_layout()
-    plt.savefig("hist_year.pdf")
+    plt.savefig(tag+"hist_year.pdf")
     
     # log version
     plt.yscale("log")
     plt.ylabel("Event count (log scale)")
-    plt.savefig("hist_year_log.pdf")
-    
-    plt.show()
+    plt.savefig(tag+"hist_year_log.pdf")
+    if show:
+        plt.show()

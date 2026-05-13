@@ -36,18 +36,18 @@ SHEET_MAP = {
                 , ISSUE:"Issue TYPE"}
     }
 
-def load_incidents(incidents_json, chunk_size, OUT):#="out/chunked_"
+def load_incidents(incidents_json, chunk_size, OUT, ignore_cov_file = False):#="out/chunked_"
     incidents = None
     with open(incidents_json, "r", encoding="utf-8") as fp:
         incidents = json.load(fp)
     relevant_chunks = {}
     cov_file = OUT+"/coverage_analysis.json"
-    if os.path.exists(cov_file):
+    if os.path.exists(cov_file) and not ignore_cov_file:
         with open(cov_file, "r", encoding="utf-8") as fp:
             cover_anal = json.load(fp)
             for i, ts in enumerate(cover_anal["files"]):
                 relevant_chunks[ts] = {"files":cover_anal["files"][ts]
-                                       , "score":cover_anal["l2l_coverage"][i]
+                                       , "score":{k:cover_anal["coverage"][k][i] for k in cover_anal["coverage"]}
                                        , "files_all":cover_anal["files_all"][ts]}
     for k in incidents:
         incident = Incident(incident=incidents[k])
@@ -104,7 +104,8 @@ class Incident:
         self.issue_type = extract_from_sheet(row, ISSUE)
         self._target_chunks_unique = None
         self._target_chunks_all = None
-        self._target_retrieval_rec_unique = None
+        self._target_score = None
+        self.target_times = []# not used yet
 
     
     def __str__(self):
@@ -114,9 +115,9 @@ class Incident:
         if not self._target:
             converted_target = ExtractorLog.all_from_text(self.raw_target)
             preprocessed = []
-            for l in converted_target:
-                line = rec_to_txt(l=l)
-                preprocessed.append(line)
+            for line in converted_target:
+                self.target_times.append(line[0])
+                preprocessed.append(line[-1])
             self._target = ""
             for i in range(len(preprocessed)-1):
                 self._target+=preprocessed[i]+"\n"
@@ -131,16 +132,19 @@ class Incident:
             return
         target_files_unique = rel_chunks["files"]
         self._target_chunks_unique = []
-        self._target_retrieval_rec_unique = rel_chunks["score"]
+        self._target_score = rel_chunks["score"]
         load_target_chunk_info(target_files_unique, self._target_chunks_unique)
         
         target_files_all = rel_chunks["files_all"]
         self._target_chunks_all = []
         load_target_chunk_info(target_files_all, self._target_chunks_all)
-        
     
     def get_relevant_chunks(self):
         return self._target_chunks_unique, self._target_chunks_all
+    
+    def get_potential_scores(self):
+        return self._target_score
+        
 
 def log_file_reader(pth):
     content = None
@@ -163,13 +167,5 @@ def line_in_content(content, pth=None):
                 cont = log_entry[-1]
             else:
                 raise Exception(str(type(log_entry[1]))+" type in log_entry[1] for: "+pth)
-            log_entry[-1] = cont
-            log_line = rec_to_txt(log_entry)
-            if log_line is None:
-                print(pth)
-        elif len(log_entry) == 1:
-            log_line = log_entry[0]
-        else:
-            raise Exception("Error of log entry length:"+str(log_entry))
-        for line in log_line.split("\n"):
+        for line in cont.split("\n"):
             yield line
