@@ -9,8 +9,9 @@ import json
 
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
-def plot_radar(dict_a, dict_b, label_a, label_b, title, dest):
+def plot_radar(dict_a, dict_b, label_a, label_b, title, dest, show=False):
     # Ensure both dictionaries have the same keys
     if set(dict_a.keys()) != set(dict_b.keys()):
         raise ValueError("Both dictionaries must have the same keys.")
@@ -48,7 +49,59 @@ def plot_radar(dict_a, dict_b, label_a, label_b, title, dest):
     safename = title.replace(" ", "").replace("'s","")
     dest = dest+safename
     plt.savefig(fname=dest+".pdf")
-    plt.show()
+    if show:
+        plt.show()
+
+
+from pathlib import Path
+
+def plot_hist(values, title, dest=None, xlabel="Recall", bins=30):
+    if not values:
+        raise ValueError("No valid numeric values found to plot.")
+
+    plt.figure(figsize=(8, 5))
+    plt.hist(values, bins=bins, edgecolor="black")
+
+    plt.xlabel(xlabel=xlabel)
+    plt.ylabel("Count")
+    plt.title(title)
+
+    plt.grid(axis="y", alpha=0.3)
+    plt.tight_layout()
+    name = title.replace(" ", "")
+    if dest is not None:
+        dest = Path(dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        plt.savefig(dest / (name+".pdf"), dpi=300)
+        plt.close()
+    else:
+        plt.show()
+
+def flatten(arr_a, NORMALIZED):
+    data = []
+    for d in arr_a:
+        if NORMALIZED:
+            if d[1] == 0:
+                print("ERROR", d)
+            else:
+                s = d[0]/d[1] 
+        else:
+            s = d[0]
+        data.append(s)
+    return data
+
+import statistics
+def show_separate(ret_comp, agent_comp, NORMALIZED, dest):
+    tag = " - normalized" if NORMALIZED else ""
+    title = "Recall distribution"
+    for k in ret_comp:
+        values = flatten(ret_comp[k], NORMALIZED=NORMALIZED)
+        print("retr median:",k, statistics.median(values))
+        plot_hist(values=values, title=title+"["+k+"] of the retriever"+tag, dest=dest)
+    for k in agent_comp:
+        values = flatten(agent_comp[k], NORMALIZED=NORMALIZED)
+        print("agent median:",k, statistics.median(values))
+        plot_hist(values=values, title=title+"["+k+"] of the agent"+tag, dest=dest)
 
 def calc_recall(data, k, tag, NORMALIZED):
     achieved = 0
@@ -64,33 +117,50 @@ def calc_recall(data, k, tag, NORMALIZED):
     print(k+":",recall)
     return recall
 
-def compare(comparisons, tag, normalization):
+def trans_comps(comparisons):
     transformed_comp = {}
     for comp in comparisons:
         for k in comp:
             if k not in transformed_comp:
                 transformed_comp[k] = []
             transformed_comp[k].append(comp[k])
+    return transformed_comp
+
+def compare(transformed_comp, tag, normalization):
     recalls = {}
     for k in transformed_comp:
         rcll = calc_recall(data=transformed_comp[k], k=k, tag=tag, NORMALIZED=normalization)
         recalls[k] = rcll
     return recalls
 
-def show_comparisons(res_file_name):
+def get_cont(res_file_name):
     with open(res_file_name, "r", encoding="utf-8") as fp:
         res = json.load(fp)
-    ret_comparisons = res["retriever_compared_metrics"]
-    agent_comparisons = res["agent_compared_metrics"]
     dest = res_file_name.replace("\\","/")
-    dest = dest.split(dest.split("/")[-1])[0]
+    filename = dest.split("/")[-1]
+    dps = dest.split(filename)
+    dest = dps[0]+filename.split(".")[0]+"/"
+    print("=>", dest)
+    os.makedirs(dest, exist_ok=True)
+    return res, dest
+
+def show_comparisons(res, dest):
+    
+    ret_comparisons = res["retriever_compared_metrics"]
+    ret_comparisons = trans_comps(ret_comparisons)
+
+    agent_comparisons = res["agent_compared_metrics"]
+    agent_comparisons = trans_comps(agent_comparisons)
+
+    #dest = dest.split(dest.split("/")[-1])[0]
     for normalization in [True, False]:
         note = ("Normalized" if normalization else "Absolute")
         print("\n","="*16,note, "="*16)
-        retr_rec = compare(comparisons=ret_comparisons, tag="Retriever", normalization=normalization)
+        retr_rec = compare(transformed_comp=ret_comparisons, tag="Retriever", normalization=normalization)
         print()
-        agent_rec = compare(comparisons=agent_comparisons, tag="Agent", normalization=normalization)
+        agent_rec = compare(transformed_comp=agent_comparisons, tag="Agent", normalization=normalization)
         plot_radar(dict_a=retr_rec, dict_b=agent_rec, label_a="Retriever", label_b="Agent", title="Retriever's and Agent's Recall ("+note+")", dest=dest)
+        show_separate(ret_comp=ret_comparisons, agent_comp=agent_comparisons, NORMALIZED=normalization, dest=dest)
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -105,9 +175,15 @@ def parse_args():
     args = parser.parse_args()
     return args.results
 
+def show_usage(res, dest):
+    usage = res["samples"]["usage-rounds"]
+    plot_hist(values=usage, title="Conversation rounds distribution", dest=dest, xlabel="Rounds")
+
 def main():
     resultsfile = parse_args()
-    show_comparisons(res_file_name=resultsfile)
+    res, dest = get_cont(res_file_name=resultsfile)
+    show_comparisons(res, dest)
+    show_usage(res, dest)
 
 if __name__ == "__main__":
     main()

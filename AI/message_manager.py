@@ -15,6 +15,7 @@ def standardize(prompt):
     prompt["content"] = c
     return prompt
 
+
 def truncate_retrieved(manager):
     if manager.last_calls == 0:
         return
@@ -26,6 +27,7 @@ def truncate_retrieved(manager):
         message.pop("tool_calls")# remove all tool calls
     manager.messages.append(message)# keep at least track of thoughts
     print("popop", len(manager.messages))
+
 
 
 def default_composer(manager):
@@ -76,10 +78,11 @@ class MessageManager:
     def __init__(self, db_manager
                  , system_prompt_pth
                  , context_management_strategy
-                 , gpt
-                 , max_iter = 20):
+                 #, gpt
+                 #, model
+                 , max_iter = 30):
         self.db_manager = db_manager
-        self.gpt = gpt# might be used, depending on the context_management_strategy
+        #self.gpt = gpt# might be used, depending on the context_management_strategy
         
         self.predefined_prompts = None
         with open(system_prompt_pth, "r", encoding="utf-8") as fp:

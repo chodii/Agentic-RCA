@@ -75,7 +75,7 @@ def parse_record(obj: dict) -> Optional[dict]:
         "source_path": source_path,
         "chunk_id": int(chunk_id),
         "content_json": json.dumps(content),
-        "content_text": flatten_content(content),
+        "content_text": source_path+"\n"+flatten_content(content),
         "time_start": t0,
         "time_end": t1,
         "has_time": content[-1][0] is not None
@@ -152,7 +152,14 @@ def import_dataset(root, clear_first=True):
     print(f"\rDone. Inserted={inserted}, skipped={skipped}",end="")
 
 def flatten_content(content) -> str:
-    return "\n".join(line[-1] for line in content)
+    fltcnt = ""
+    for line in content:
+        cnt = line[-1]
+        if type(cnt) == list:
+            fltcnt += cnt+"\n"
+        elif type(cnt) == dict:
+            fltcnt += str(cnt)+"\n"
+    return fltcnt.strip()
 
 def api(root):
     import_dataset(root, clear_first=True)

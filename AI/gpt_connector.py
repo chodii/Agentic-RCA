@@ -22,11 +22,11 @@ def ask_open_ai():
 import requests
 import json
 import time
-def ask_open_router(messages, tools=None, timer=0.5):
+def ask_open_router(messages, tools=None, timer=0.5, model="openai/gpt-4o-mini"):
     time.sleep(timer)
     API_KEY = os.environ["OPENROUTER"]
     #model = "openai/gpt-5.2"
-    model="openai/gpt-4o-mini"
+    model=model
     #model="openai/gpt-5-mini"
     
     #model = "xiaomi/mimo-v2.5-pro"
@@ -57,14 +57,13 @@ def ask_open_router(messages, tools=None, timer=0.5):
       data=json.dumps(data_content)
     )
     #return response
-    response.raise_for_status()
     if not response.ok:
         print("STATUS:", response.status_code)
-        print("BODY:", response.text)
+        print("BODY:", response.text[:5000])
         response.raise_for_status()
+    response.raise_for_status()
 
     model_response = response.json()
-
-    model_response = model_response["choices"][0]["message"]
     usage = model_response.get("usage", {})
+    model_response = model_response["choices"][0]["message"]
     return usage, model_response

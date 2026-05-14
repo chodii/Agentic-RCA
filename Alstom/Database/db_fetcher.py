@@ -73,8 +73,9 @@ def get_file_time_pattern(source_path:str=None
     qs = []
     qv = []
     query="""
-         SELECT id, source_path, chunk_id, content_json, time_start, time_end
+         SELECT source_path, chunk_id, content_json
         """
+    # SELECT id, source_path, chunk_id, content_json, time_start, time_end
     qorder = " ORDER BY time_start"
     if elastic_pattern is not None:
         query += f", similarity(content_text, %s) AS sim"

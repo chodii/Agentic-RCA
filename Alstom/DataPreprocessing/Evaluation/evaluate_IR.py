@@ -80,6 +80,7 @@ def safe_div(n1, n2):
     return 0 if n2 == 0 else n1/n2
 
 
+
 def db_rec(METRICS, target_rca, retrieved_chunks, potential_scores):
     TM = target_manager(target=target_rca)
     r2 = []# relevant unique
@@ -152,14 +153,23 @@ def ref_vs_gen(reference:str, generated:str):
                 if len(word) == 0:
                     continue
                 if word in ref_words:
-                    ret_num_words += 1
-                    ret_len_words += len(word)
+                    new_ref = []
+                    repe = 0
+                    for _ref_word in ref_words:
+                        if word == _ref_word:
+                            repe += 1
+                        else:
+                            new_ref.append(_ref_word)
+                    ref_words = new_ref
+                    ret_num_words += repe
+                    ret_len_words += len(word)*repe
             if gen in ref:
                 ret_num_lines += 1
                 break
     rcll_characters = ret_len_words/ref_len_words
     rcll_words = ret_num_words/ref_num_words
     rcll_lines = ret_num_lines/ref_num_lines
+    
     return rcll_characters, rcll_words, rcll_lines
 
 import re
@@ -308,7 +318,6 @@ class target_manager:
         for i in range(len(self.line_target_2)):
             if line in self.line_target_2[i]:
                 self.found_lines2.append(line)
-                print("->",line)
                 contribution = True
             else:
                 new_line_target.append(self.line_target_2[i])
